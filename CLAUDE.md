@@ -175,6 +175,26 @@ e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets
 with no `backend/.env` at all. Verify that by moving `.env` aside and re-running, because
 CI has no `.env`.
 
+**The Scene Picker catalogue comes from TMDB, and the data does not match our types.** Read
+the `tmdb-catalogue` skill before writing import or pick-generation code. The four facts
+that catch people, in descending order of pain:
+
+1. **TMDB has two different genre vocabularies**, 19 for movies and 16 for TV, and they are
+   not subsets of each other. All twelve of our onboarding genres exist for movies (one
+   rename: `Science Fiction` to `Sci-Fi`), but TV has **no Thriller, Romance, Horror or
+   Fantasy at all** and fuses Sci-Fi with Fantasy. Series therefore cover only eight of
+   twelve.
+2. **There is no TMDB dataset to download.** It is an API only. The daily ID export carries
+   no genre, runtime or date, so it cannot build a catalogue.
+3. **`runtime` is not on `/discover`**, only on the detail endpoint, so the import is two
+   passes. For series it is `episode_run_time`, which is **per episode**, not a total.
+4. **`type` has no TMDB field.** It comes from which endpoint you called. It is also purely
+   descriptive: nothing in the design filters, groups or sorts by it.
+
+Related design gap: per A17, `year`, `runtime` and `director` are displayed on the title
+detail screen but no form captures them, so **the catalogue is the only source of runtime and
+year in the entire app**. That is a larger role than "picker feed".
+
 ## Environment variables
 
 Copy the templates, then fill in values. Both real files are gitignored.
@@ -221,6 +241,7 @@ matching phrases, not registered commands.
 | `repo-review-prs` | Fetches open PRs via `gh` and reviews unreviewed ones                                                                                                              |
 | `backend-nestjs`  | Passive reference library, 12 NestJS rules across 7 categories. Consulted when writing backend code                                                                |
 | `frontend-nextjs` | Passive reference library, 16 Next.js/React rules. Consulted when writing frontend code                                                                            |
+| `tmdb-catalogue`  | Passive reference. Where the TMDB data disagrees with our types, and which catalogue decisions are settled. Read it before touching the Scene Picker catalogue     |
 
 **Agents** (delegated subtasks with their own context): `code-reviewer`, `debugger`,
 `test-automator`, `nestjs-specialist` and `nextjs-specialist` (these two fetch and
