@@ -207,6 +207,27 @@ e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets
 with no `backend/.env` at all. Verify that by moving `.env` aside and re-running, because
 CI has no `.env`.
 
+**Deployment is one Vercel project, two services, one domain.** `vercel.json` uses
+[Vercel Services](https://vercel.com/docs/services). Two decisions in it are non-obvious and
+JSON cannot explain itself, so: the **frontend owns every public path** because Next.js
+serves `/api/auth/*` and routing into a service is final, so a top-level `/api/*` rewrite to
+NestJS would swallow every auth request with no fallback. And the **backend has no public
+route**, only a service binding, because every backend call is server-side from a Server
+Component. The binding injects `BACKEND_URL`, which is already the variable the frontend
+reads, so no code differs between local and deployed. Never set `BACKEND_URL` manually in
+Vercel; a hardcoded value breaks preview deployments. Full reasoning in README's Deployment
+section.
+
+**Services mode needs an explicit `entrypoint`, even where the framework is zero-config
+standalone.** Vercel's NestJS page advertises zero configuration, which holds for a
+standalone project but not inside `services`: the build fails with `must specify an
+"entrypoint" for runtime "node"`. The backend therefore declares
+`"entrypoint": "src/main.ts"`, relative to the service's own `root`, not the repo root.
+
+Two deployment steps have no automation and fail quietly: the deployed domain must be added
+to Neon Auth (`neonctl neon-auth domain add`) or sign-in redirects fail, and migrations must
+be applied by hand with `npm run db:migrate:deploy`.
+
 **The Scene Picker catalogue comes from TMDB, and the data does not match our types.** Read
 the `tmdb-catalogue` skill before writing import or pick-generation code. The four facts
 that catch people, in descending order of pain:
