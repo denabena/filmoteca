@@ -1,4 +1,8 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  // prisma.config.ts is excluded because it sits at the package root rather than
+  // under src/. Including it makes tsc infer the package root as the common root
+  // and emit dist/src/main.js instead of dist/main.js, which breaks start:prod.
+  // The Prisma CLI loads that file itself and never needs it compiled.
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma.config.ts"]
 }
