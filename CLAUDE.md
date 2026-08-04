@@ -9,10 +9,14 @@ duplicate. When something structural changes, check whether both need updating.
 
 ## What this is
 
-**Decode Academy Demo**, a teaching boilerplate for academy final projects. A minimal
-Next.js frontend talks to a NestJS backend over HTTP. Exactly one feature works
-end to end: the frontend fetches a greeting from the backend's `GET /api/hello` and
-renders it. Everything else is scaffolding for you to build on.
+**Decode Academy Demo**, a teaching boilerplate for academy final projects, now being built
+out into **Scene**, a movie and watchlist tracker (see `docs/project-management/`, Jira
+project `FIL`). A Next.js frontend talks to a NestJS backend over HTTP.
+
+What exists: the frontend app shell (a fixed sidebar plus four placeholder views) and one
+backend endpoint, `GET /api/hello`. Nothing in the frontend calls the backend yet, so there
+is currently **no working end-to-end path**; the page that used to demonstrate one was
+replaced by the dashboard route. Everything else is scaffolding.
 
 Because this is a starting point rather than a finished app, the "Not yet built"
 section at the bottom is load-bearing. Read it before assuming a feature exists.
@@ -75,8 +79,8 @@ Frontend, from `frontend/`:
 | `npm test`           | Jest + React Testing Library (jsdom)            |
 | `npm run test:watch` | Same, in watch mode                             |
 
-Single test in either app: `npm test -- page` filters by path,
-`npm test -- -t "greeting"` filters by test name.
+Single test in either app: `npm test -- sidebar` filters by path,
+`npm test -- -t "keyboard"` filters by test name.
 
 Neither app has a standalone `typecheck` script. `npm run build` is the typecheck.
 
@@ -94,11 +98,32 @@ consequence: `GET http://localhost:3000/` returns 404, which is normal, not a br
 server. The e2e test re-applies the same prefix manually to match production, so if you
 change the prefix you must change it in both places.
 
-**Frontend to backend data flow.** The home page (`frontend/src/app/page.tsx`) is an
-**async Server Component**. It fetches the backend at request time on the server with
-`cache: 'no-store'`, which means no CORS is involved and there is no client-side loading
-state for that call. CORS is enabled on the backend anyway (`main.ts`), for the case of
-genuinely client-side fetches, allowing origin `FRONTEND_URL`.
+**Frontend app shell.** Routes that sit beside the sidebar live in the
+`frontend/src/app/(shell)/` route group, whose layout renders `Sidebar` and the routed view.
+The dashboard is the index route (`/`), then `/library`, `/picker` and `/settings`. The
+sidebar is a Client Component because the active item comes from `usePathname()`, but it
+stays a leaf: page content arrives through the layout's `children`, so nothing else is
+pulled into the client bundle.
+
+**Do not move the sidebar into the root layout.** The parentheses make `(shell)` a route
+group, so it adds no URL segment (`(shell)/page.tsx` serves `/`, not `/shell`) but it does
+add a layout level. That level exists because the sign in and create account screens are
+specified as a centred card on the canvas **outside the app shell** (spec SGN-1, REG-1), so
+they must not inherit the sidebar. They belong in a sibling group, `(auth)/`, when FIL-15 and
+FIL-17 build them. A root-level layout would wrap them too.
+
+**The signed-in profile is mocked in exactly one place.** `frontend/src/lib/current-user.ts`
+holds `getCurrentUser()` and a fixed profile, because the sidebar (Jira `FIL-27`) shipped
+before the sign in endpoint (`FIL-12`). The layout reads it on the server and hands it to
+`ProfileProvider`, which keeps it in client state so the footer name and avatar initials can
+change without a reload. When auth lands, only that one function changes. Do not read the
+mock anywhere else.
+
+**Frontend to backend data flow.** There is no live example right now. When you add one,
+fetch in an async Server Component with `cache: 'no-store'`, which is what the removed demo
+page did: no CORS is involved and there is no client-side loading state. CORS is enabled on
+the backend anyway (`main.ts`) for genuinely client-side fetches, allowing origin
+`FRONTEND_URL`.
 
 **Configuration goes through ConfigService.** `ConfigModule.forRoot({ isGlobal: true })`
 is registered in `backend/src/app.module.ts`, so it reads `backend/.env` at startup and
@@ -106,11 +131,11 @@ is registered in `backend/src/app.module.ts`, so it reads `backend/.env` at star
 through `ConfigService`, as `main.ts` does, rather than scattering `process.env` through
 the code.
 
-**API response contract is hand-mirrored, and that is a known wart.** `HelloResponse`
-is declared in `backend/src/app.service.ts` (the source of truth) and copied by hand
-into `frontend/src/app/page.tsx`. Change a response shape and you must edit both. The
-intended fix is generating frontend types from an OpenAPI spec, but the backend does not
-expose one yet.
+**There is no shared API contract.** `HelloResponse` is declared in
+`backend/src/app.service.ts` and nothing mirrors it on the frontend. The obvious move when
+you wire up the first real endpoint is to hand-copy the type into the frontend; resist it
+where you can, because it drifts silently. The intended fix is generating frontend types
+from an OpenAPI spec, but the backend does not expose one yet.
 
 ## Environment variables
 
@@ -186,11 +211,22 @@ rejected, including a bare description with no type.
 Prettier. ESLint is invoked from each app's own directory so its config and plugins
 resolve correctly, which is why you should not try to lint one app from the other's cwd.
 
+Note the patterns are all prefixed `backend/` or `frontend/`, so **nothing at the repo
+root is touched by the hook**: `README.md`, this file, `.lintstagedrc.js` and the docs
+under `docs/` are never auto-formatted on commit. Format them yourself if you want to.
+`.lintstagedrc.js` quotes every path before interpolating it into a command string,
+because a clone directory with a space in it or an App Router route group like
+`src/app/(shell)/` would otherwise abort the command with a bash syntax error.
+
 **Backend tests are not run on commit.** The hook prints a reminder only, because they
 are slow. CI runs them on every PR, but run them locally before pushing backend changes.
 
-Prettier config is split: root and frontend use `printWidth: 100` with `singleQuote`;
-the backend has its own `backend/.prettierrc`.
+Prettier config is per app and **there is none at the root**: only `.prettierignore` lives
+there. `frontend/package.json` carries `printWidth: 100` with `singleQuote`, and the
+backend has its own `backend/.prettierrc`. Root-level files are written single-quoted by
+hand but nothing enforces it, so running bare `npx prettier --write` on one from the root
+applies library defaults and will double-quote it. Pass `--config frontend/package.json`
+or leave those files alone.
 
 ## CI
 
@@ -216,13 +252,16 @@ something that is not there.
   `NEXT_PUBLIC_`. Related: `@google/genai` was once present in `frontend/node_modules`
   while absent from `package.json`, so a clean install removes it. Declare any SDK
   properly rather than relying on a leftover install.
-- **Generated API types.** No OpenAPI spec, so `HelloResponse` is hand-mirrored between
-  the two apps as described under Architecture.
+- **Generated API types.** No OpenAPI spec, so there is no shared contract between the two
+  apps, as described under Architecture.
 - **Config validation.** No `validationSchema` on `ConfigModule`.
-- **`frontend/src/components/`.** Does not exist. Create it with your first shared
-  component.
+- **Authentication.** No user model, no session, no route protection. The sidebar profile is
+  mocked in `frontend/src/lib/current-user.ts` until it exists.
 - **A database.** Nothing is wired up. Pick your own persistence layer; that choice is
   deliberately left to you.
+- **The rest of the Scene UI.** Only the sidebar is real. The four routed views are
+  placeholders, and there is no page header pattern, no shared Button/Input/Tag components
+  and no genre palette yet, though the design defines all of them.
 
 `backend/README.md` is the stock NestJS starter README. Ignore it as a source of truth
 for this project.
