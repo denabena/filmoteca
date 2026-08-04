@@ -194,6 +194,12 @@ reads, so no code differs between local and deployed. Never set `BACKEND_URL` ma
 Vercel; a hardcoded value breaks preview deployments. Full reasoning in README's Deployment
 section.
 
+**Services mode needs an explicit `entrypoint`, even where the framework is zero-config
+standalone.** Vercel's NestJS page advertises zero configuration, which holds for a
+standalone project but not inside `services`: the build fails with `must specify an
+"entrypoint" for runtime "node"`. The backend therefore declares
+`"entrypoint": "src/main.ts"`, relative to the service's own `root`, not the repo root.
+
 Two deployment steps have no automation and fail quietly: the deployed domain must be added
 to Neon Auth (`neonctl neon-auth domain add`) or sign-in redirects fail, and migrations must
 be applied by hand with `npm run db:migrate:deploy`.

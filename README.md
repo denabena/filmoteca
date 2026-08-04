@@ -554,9 +554,23 @@ frontend already reads**, so no application code changes between local and deplo
 value is deployment-aware, so a preview deployment's frontend talks to that same preview's
 backend. Internal calls also skip CORS entirely, since they never touch the public edge.
 
-**NestJS needs no configuration.** Vercel detects `backend/src/main.ts` as a server
-entrypoint and turns the app into a single Function. Our `main.ts` already has the
-conventional `bootstrap()` calling `app.listen()`, so nothing changed for deployment.
+**NestJS must declare its entrypoint, despite the zero-config docs.** Vercel's
+[NestJS page](https://vercel.com/docs/frameworks/backend/nestjs) says deployment is zero
+configuration, and that is true for a **standalone** project. In **services** mode it is
+not: the build fails with
+
+```text
+Error: Service "backend" detected framework "nestjs" in "backend" and must
+specify an "entrypoint" for runtime "node".
+```
+
+Hence `"entrypoint": "src/main.ts"`. The schema defines it as "relative to the workspace
+directory", meaning relative to the service's own `root`, so it is `src/main.ts` and not
+`backend/src/main.ts`. `framework` is pinned to `"nestjs"` too, because Vercel otherwise
+re-detects it on every build.
+
+No application code changed. Our `main.ts` already has the conventional `bootstrap()`
+calling `app.listen()`, which is what Vercel turns into a single Function.
 
 ### Environment variables in Vercel
 
@@ -645,21 +659,23 @@ for the two supported setups and their trade-offs.
 
 ## Gotchas
 
-| Symptom                                                   | Cause                                                                                                                                                 |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `http://localhost:3000/` returns 404                      | Correct. A global `api` prefix means the route is `/api/hello`. The prefix is set once in `backend/src/main.ts`                                       |
-| Page says "Could not reach the API"                       | The backend is not running, or not on 3000                                                                                                            |
-| `node: command not found`, but it worked via the AI agent | Claude Code can ship its own bundled Node, which your terminal does not see. Install Node yourself, see [Prerequisites](#prerequisites)               |
-| Servers die as soon as the AI assistant finishes          | Expected. Processes an assistant starts belong to its session. Start `npm run start:dev` and `npm run dev` in your own terminals and leave them open  |
-| Commits go through with no lint or message check          | You skipped the root `npm install`, so the hooks were never installed. Check with `git config core.hooksPath`, which should print `.husky/_`          |
-| ESLint cannot find its config                             | You ran it from the repo root. Each app's ESLint runs from that app's directory                                                                       |
-| Ports look backwards                                      | They are asymmetric on purpose: backend **3000**, frontend **4200**. Both are wired into code and config, so do not swap them                         |
-| Port already in use                                       | A dev server from an earlier session. `lsof -nP -iTCP:3000 -sTCP:LISTEN` on macOS/Linux, `netstat -ano \| findstr :3000` on Windows                   |
-| Migrations fail with odd SQL or prepared-statement errors | You are migrating over the **pooled** URL. Migrations need `DATABASE_URL_UNPOOLED`. See [Database and auth](#database-and-auth)                       |
-| First database query takes over a second                  | Neon scales to zero, so an idle branch cold-starts. Normal. Never write a test that assumes a fast first connection                                   |
-| `Cannot find module '@prisma/client'` or missing types    | The client is generated, not committed. Run `npm run db:generate` in `backend/`                                                                       |
-| 401 from `/api/me` with a token that looks fine           | Either the token expired (they last ~15 minutes) or `NEON_AUTH_JWKS_URL` is wrong. The guard logs the real reason; the response deliberately does not |
-| Sign-in does nothing, no error                            | `NEON_AUTH_COOKIE_SECRET` is missing or under 32 characters                                                                                           |
+| Symptom                                                         | Cause                                                                                                                                                           |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http://localhost:3000/` returns 404                            | Correct. A global `api` prefix means the route is `/api/hello`. The prefix is set once in `backend/src/main.ts`                                                 |
+| Page says "Could not reach the API"                             | The backend is not running, or not on 3000                                                                                                                      |
+| `node: command not found`, but it worked via the AI agent       | Claude Code can ship its own bundled Node, which your terminal does not see. Install Node yourself, see [Prerequisites](#prerequisites)                         |
+| Servers die as soon as the AI assistant finishes                | Expected. Processes an assistant starts belong to its session. Start `npm run start:dev` and `npm run dev` in your own terminals and leave them open            |
+| Commits go through with no lint or message check                | You skipped the root `npm install`, so the hooks were never installed. Check with `git config core.hooksPath`, which should print `.husky/_`                    |
+| ESLint cannot find its config                                   | You ran it from the repo root. Each app's ESLint runs from that app's directory                                                                                 |
+| Ports look backwards                                            | They are asymmetric on purpose: backend **3000**, frontend **4200**. Both are wired into code and config, so do not swap them                                   |
+| Port already in use                                             | A dev server from an earlier session. `lsof -nP -iTCP:3000 -sTCP:LISTEN` on macOS/Linux, `netstat -ano \| findstr :3000` on Windows                             |
+| Migrations fail with odd SQL or prepared-statement errors       | You are migrating over the **pooled** URL. Migrations need `DATABASE_URL_UNPOOLED`. See [Database and auth](#database-and-auth)                                 |
+| First database query takes over a second                        | Neon scales to zero, so an idle branch cold-starts. Normal. Never write a test that assumes a fast first connection                                             |
+| `Cannot find module '@prisma/client'` or missing types          | The client is generated, not committed. Run `npm run db:generate` in `backend/`                                                                                 |
+| 401 from `/api/me` with a token that looks fine                 | Either the token expired (they last ~15 minutes) or `NEON_AUTH_JWKS_URL` is wrong. The guard logs the real reason; the response deliberately does not           |
+| Sign-in does nothing, no error                                  | `NEON_AUTH_COOKIE_SECRET` is missing or under 32 characters                                                                                                     |
+| Vercel build: `must specify an "entrypoint" for runtime "node"` | Services mode needs an explicit entrypoint even for frameworks that deploy with zero config standalone. Set it relative to the service `root`, so `src/main.ts` |
+| Sign-in works locally but redirects fail on the deployed URL    | The deployed domain is not a Neon Auth trusted domain yet. `npx neonctl neon-auth domain add <domain> --project-id <id>`                                        |
 
 ## Where to go from here
 
