@@ -1,19 +1,33 @@
 @import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Scene foundations. The Figma Foundations page is explicitly dark theme only
+ * (tech spec section 5), so there is no light variant and no
+ * prefers-color-scheme switch here.
+ *
+ * Only tokens with a value confirmed in the design are declared. Surfaces and
+ * status tones that this screen does not use are deliberately absent rather
+ * than guessed: add them in the ticket that needs them.
+ */
+@theme {
+  --color-canvas: #0f1216;
+  --color-surface-sidebar: #0b0e12;
+  --color-surface-card-raised: #1f242b;
+  --color-surface-elevated: #262c34;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-text-primary: #f4f6f8;
+  --color-text-secondary: #a6adb8;
+  --color-text-tertiary: #6c7480;
+
+  --color-accent: #f0455f;
+
+  /* Loaded by next/font in src/app/layout.tsx. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
 }
