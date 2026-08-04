@@ -1,15 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService, type HelloResponse } from './app.service';
-import {
-  DatabaseService,
-  type DatabasePing,
-} from './database/database.service';
+import { PrismaService, type DatabasePing } from './prisma/prisma.service';
 
 @Controller()
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly database: DatabaseService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // With the global 'api' prefix (see main.ts), this is GET /api/hello.
@@ -22,6 +19,6 @@ export class AppController {
   // reachable, which you need to check before auth can work at all.
   @Get('health/db')
   getDatabaseHealth(): Promise<DatabasePing> {
-    return this.database.ping();
+    return this.prisma.ping();
   }
 }

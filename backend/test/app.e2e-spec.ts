@@ -3,7 +3,7 @@ import { CanActivate, INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
-import { PG_POOL } from './../src/database/database.service';
+import { PrismaService } from './../src/prisma/prisma.service';
 import { NeonAuthGuard } from './../src/auth/neon-auth.guard';
 
 describe('AppController (e2e)', () => {
@@ -13,13 +13,16 @@ describe('AppController (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      // AppModule wires a real Neon pool and a guard that fetches Neon's JWKS,
-      // and both throw at construction when their variables are absent. CI has
-      // no backend/.env, so overriding them is what keeps this suite runnable
-      // without credentials. Overrides replace the providers before Nest ever
-      // instantiates the real ones.
-      .overrideProvider(PG_POOL)
-      .useValue({ query: jest.fn(), end: jest.fn() })
+      // AppModule wires a real Prisma client whose constructor throws without
+      // DATABASE_URL. CI has no backend/.env, so overriding it is what keeps
+      // this suite runnable without credentials. Overrides replace the provider
+      // before Nest ever instantiates the real one.
+      .overrideProvider(PrismaService)
+      .useValue({
+        ping: jest.fn(),
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
       .overrideProvider(NeonAuthGuard)
       .useValue({ canActivate: () => false } satisfies CanActivate)
       .compile();

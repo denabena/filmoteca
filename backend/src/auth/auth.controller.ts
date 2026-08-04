@@ -1,8 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import {
-  DatabaseService,
-  type DatabasePing,
-} from '../database/database.service';
+import { PrismaService, type DatabasePing } from '../prisma/prisma.service';
 import { CurrentUser } from './current-user.decorator';
 import { NeonAuthGuard, type NeonAuthUser } from './neon-auth.guard';
 
@@ -23,7 +20,7 @@ export interface MeResponse {
 
 @Controller()
 export class AuthController {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   @Get('me')
   @UseGuards(NeonAuthGuard)
@@ -33,7 +30,7 @@ export class AuthController {
       // Claim names only, never values: this response goes to the browser and
       // the raw token payload can carry more than we intend to expose.
       tokenClaims: Object.keys(user.claims).sort(),
-      database: await this.database.ping(),
+      database: await this.prisma.ping(),
     };
   }
 }

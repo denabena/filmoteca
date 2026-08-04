@@ -10,9 +10,11 @@ duplicate. When something structural changes, check whether both need updating.
 ## What this is
 
 **Decode Academy Demo**, a teaching boilerplate for academy final projects. A minimal
-Next.js frontend talks to a NestJS backend over HTTP. Exactly one feature works
-end to end: the frontend fetches a greeting from the backend's `GET /api/hello` and
-renders it. Everything else is scaffolding for you to build on.
+Next.js frontend talks to a NestJS backend over HTTP. Two things work end to end: the
+frontend fetches a greeting from the backend's `GET /api/hello` and renders it, and
+accounts work through Neon Auth with the backend verifying the caller's JWT on
+`GET /api/me`. Persistence is Neon Postgres via Prisma. Everything else is scaffolding for
+you to build on.
 
 Because this is a starting point rather than a finished app, the "Not yet built"
 section at the bottom is load-bearing. Read it before assuming a feature exists.
@@ -25,7 +27,13 @@ workspaces, turbo, or nx setup. The root `package.json` owns only repo-wide dev 
 
 ```text
 backend/          NestJS 11 API, port 3000, its own package.json + node_modules
+  prisma/         schema.prisma and committed migrations
+  prisma.config.ts  Prisma 7 CLI config. Excluded from tsconfig.build.json
+  src/prisma/     PrismaService, global
+  src/auth/       NeonAuthGuard, @CurrentUser, GET /api/me
 frontend/         Next.js 16 + React 19, port 4200, its own package.json + node_modules
+  src/lib/auth/   Neon Auth server and client instances
+  src/app/api/auth/[...path]/  Proxies auth calls to Neon, server-side
 .claude/          Skills, agents and permissions for Claude Code (see below)
 .github/workflows/ci.yml
 .husky/           pre-commit and commit-msg hooks
@@ -63,6 +71,20 @@ Backend, from `backend/`:
 | `npm run test:watch` | Same, in watch mode                                       |
 | `npm run test:e2e`   | Supertest e2e (`test/`, uses `test/jest-e2e.json`)        |
 | `npm run test:cov`   | Coverage                                                  |
+
+Database, also from `backend/`. All of these go through the Prisma CLI, which reads
+`prisma.config.ts` and therefore the **direct** connection string:
+
+| Command                     | Purpose                                                   |
+| --------------------------- | --------------------------------------------------------- |
+| `npm run db:migrate`        | Create and apply a migration in development               |
+| `npm run db:migrate:deploy` | Apply existing migrations without creating one (CI, prod) |
+| `npm run db:migrate:status` | Which migrations have been applied                        |
+| `npm run db:generate`       | Regenerate Prisma Client. Also runs on `npm install`      |
+| `npm run db:studio`         | Data browser GUI                                          |
+
+Prisma Client is generated, not committed. A `postinstall` hook regenerates it, so a fresh
+clone gets a working client from `npm install` alone.
 
 Frontend, from `frontend/`:
 
@@ -110,24 +132,71 @@ the code.
 is declared in `backend/src/app.service.ts` (the source of truth) and copied by hand
 into `frontend/src/app/page.tsx`. Change a response shape and you must edit both. The
 intended fix is generating frontend types from an OpenAPI spec, but the backend does not
-expose one yet.
+expose one yet. `MeResponse` in `backend/src/auth/auth.controller.ts` is mirrored into
+`frontend/src/app/me/page.tsx` the same way, so the wart now has two instances.
+
+**Neon gives two connection strings and mixing them up is the classic failure.**
+`DATABASE_URL` is pooled (its host carries `-pooler`) and serves request paths;
+`DATABASE_URL_UNPOOLED` is direct and is what migrations and bulk import scripts must use.
+The pooled endpoint runs PgBouncer in transaction mode, which discards prepared statements
+between transactions, so migrating over it fails as apparently random SQL errors rather
+than a clear config error. `backend/prisma.config.ts` pins Migrate to the direct URL;
+`PrismaService` uses the pooled one.
+
+**Prisma owns `public`; Neon Auth owns `neon_auth`.** `neon_auth` holds `user`, `session`,
+`account`, `jwks` and more, managed by Neon itself, and is deliberately absent from
+`schema.prisma` so no migration can create or drop it. This is why `Profile.userId` is a
+plain string and not a foreign key: the user row lives in a schema Prisma does not manage,
+and the verified JWT already carries the caller's identity, so no join is needed to know
+who is asking. Note the table is `neon_auth."user"`, **not** `users_sync`; that name
+belongs to the older Stack Auth integration and does not exist here.
+
+**Auth lives in the frontend, and the backend only verifies.** Next.js owns the sign-in UI
+and the session cookie. Because the API is a separate origin it never receives that cookie,
+so the frontend mints a short-lived JWT at `/api/auth/token` and sends it as a bearer
+token. `NeonAuthGuard` verifies it against Neon's JWKS and pins `iss` and `aud` to the auth
+instance origin, derived from `NEON_AUTH_JWKS_URL` so there is one variable rather than
+three that could drift. The guard builds its verifier **lazily**: Nest constructs every
+provider at module init, so an eager config read made the whole app unbootable wherever the
+variable was absent, CI included.
+
+**Three Prisma 7 details that will confuse you if you know Prisma 6.** Connection URLs are
+no longer allowed in `schema.prisma` and live in `prisma.config.ts`, which must import
+`dotenv/config` itself because Prisma 7 stopped loading `.env`. The generator is pinned to
+`prisma-client-js` rather than the new default `prisma-client`, because the new one emits
+ESM relying on `import.meta.url`, which cannot compile to CommonJS and so breaks every Jest
+suite. And `prisma.config.ts` is excluded in `tsconfig.build.json`: it sits at the package
+root, so including it makes tsc infer that root as the common root and emit
+`dist/src/main.js` instead of `dist/main.js`, silently breaking `start:prod`.
+
+**Jest transforms `jose`.** It ships ESM only, so both jest configs carry
+`transformIgnorePatterns` that exempt it plus an inline `module: commonjs` tsconfig. The
+e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets it run
+with no `backend/.env` at all. Verify that by moving `.env` aside and re-running, because
+CI has no `.env`.
 
 ## Environment variables
 
 Copy the templates, then fill in values. Both real files are gitignored.
 
-| App      | Template                | Real file             | Variables                                                                            |
-| -------- | ----------------------- | --------------------- | ------------------------------------------------------------------------------------ |
-| Backend  | `backend/.env.example`  | `backend/.env`        | `PORT` (default 3000), `FRONTEND_URL` (CORS origin, default `http://localhost:4200`) |
-| Frontend | `frontend/.env.example` | `frontend/.env.local` | `BACKEND_URL` (default `http://localhost:3000`)                                      |
+| App      | Template                | Real file             | Variables                                                                                                                                                                  |
+| -------- | ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend  | `backend/.env.example`  | `backend/.env`        | `PORT` (default 3000), `FRONTEND_URL` (CORS origin, default `http://localhost:4200`), `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_AUTH_JWKS_URL`, `TMDB_API_READ_TOKEN` |
+| Frontend | `frontend/.env.example` | `frontend/.env.local` | `BACKEND_URL` (default `http://localhost:3000`), `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (32+ chars)                                                               |
 
-Both apps run on their defaults with no `.env` at all, so a missing file is not an error.
+**A missing `.env` used to be harmless and no longer is.** The ports still default, but
+there is no default for a Neon connection string or an auth instance, so the database and
+sign-in simply do not work without real values. Get them with
+`npx neonctl connection-string` and `npx neonctl neon-auth status`, and generate the cookie
+secret with `openssl rand -base64 32`.
 
 Note the filename difference: Nest reads `.env`, Next.js reads `.env.local`.
 
 **Never give a server-only secret a `NEXT_PUBLIC_` prefix.** `BACKEND_URL` deliberately
 has no prefix because it is read server-side only; a `NEXT_PUBLIC_` variable is inlined
-into the browser bundle and is therefore public forever.
+into the browser bundle and is therefore public forever. `NEON_AUTH_COOKIE_SECRET` and
+`TMDB_API_READ_TOKEN` are the two where a slip would do real damage: the first signs every
+session, the second is a credential tied to a personal TMDB account.
 
 There is **no config validation**: `ConfigModule` is registered without a
 `validationSchema`, so a missing variable surfaces at first use rather than at boot.
@@ -218,11 +287,11 @@ something that is not there.
   properly rather than relying on a leftover install.
 - **Generated API types.** No OpenAPI spec, so `HelloResponse` is hand-mirrored between
   the two apps as described under Architecture.
-- **Config validation.** No `validationSchema` on `ConfigModule`.
+- **Config validation.** No `validationSchema` on `ConfigModule`. This now bites harder
+  than it used to: the app boots fine without `NEON_AUTH_JWKS_URL` and only fails on the
+  first authenticated request.
 - **`frontend/src/components/`.** Does not exist. Create it with your first shared
   component.
-- **A database.** Nothing is wired up. Pick your own persistence layer; that choice is
-  deliberately left to you.
 
 `backend/README.md` is the stock NestJS starter README. Ignore it as a source of truth
 for this project.

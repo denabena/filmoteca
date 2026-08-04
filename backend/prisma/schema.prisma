@@ -1,0 +1,62 @@
+// Prisma schema for the Filmoteca backend.
+//
+// Connection URLs are NOT here. Prisma 7 removed `url` and `directUrl` from the
+// datasource block: the CLI reads its URL from prisma.config.ts, and the client
+// gets a driver adapter instead. See prisma.config.ts and src/prisma.
+//
+// Prisma manages the `public` schema only. Neon Auth owns `neon_auth` (user,
+// session, account, jwks, ...) and manages it itself, so it is deliberately
+// absent here. A migration must never create or drop those tables.
+
+// `prisma-client-js`, not Prisma 7's newer `prisma-client`, deliberately. The new
+// generator emits ESM that relies on `import.meta.url`, which cannot be compiled
+// to CommonJS. NestJS and Jest both run CommonJS here, so the new generator makes
+// every test suite fail to load. This one emits CJS and imports from
+// `@prisma/client` as usual.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Matches the `type` column throughout the design: the word after the year in
+/// every meta line ("2024 · Movie"). Values are lowercase to match the tech
+/// spec's `enum: movie, series`.
+enum TitleType {
+  movie
+  series
+}
+
+/// Per-user settings and identity, from the tech spec's Profile entity.
+///
+/// Deliberately the only model here. FIL-10 is the persistence foundation and
+/// nothing more, so Title, Genre and Pick belong to their own feature tickets.
+/// This one exists because every view needs a profile and because it establishes
+/// the ownership pattern FIL-14 enforces.
+model Profile {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The Neon Auth user id, taken from the verified JWT `sub` claim. Stored as a
+  /// plain string rather than a foreign key: `neon_auth."user"` lives in another
+  /// schema that Prisma does not manage, and Neon Auth may rewrite it. The JWT is
+  /// the source of identity, so no join is needed to know who is asking.
+  userId String @unique @map("user_id")
+
+  firstName String? @map("first_name")
+  lastName  String? @map("last_name")
+
+  /// The "15 titles / month" stepper on onboarding and in Settings.
+  monthlyWatchGoal Int @default(15) @map("monthly_watch_goal")
+
+  /// Prefills the Type field on the Add title form.
+  defaultType TitleType @default(movie) @map("default_type")
+
+  newReleaseReminders Boolean @default(false) @map("new_release_reminders")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}
