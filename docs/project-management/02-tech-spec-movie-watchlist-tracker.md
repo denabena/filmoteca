@@ -2,9 +2,11 @@
 
 This spec turns the Figma design into buildable requirements. Every requirement references the screen it comes from. If a requirement has no screen behind it, it doesn't belong here.
 
-> **Source:** Figma file [Movie / Watchlist Tracker](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=1-4), page "Screens" (17 frames). Frame names and UI copy are quoted as designed, except that long dashes are written as hyphens per DECODE writing rules.
+> **Source:** Figma file [Movie / Watchlist Tracker](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=1-4), page "Screens" (25 frames). Frame names and UI copy are quoted as designed, except that long dashes are written as hyphens per DECODE writing rules.
 >
-> **How to read requirement IDs:** each screen has a code (WEL, GOL, GNR, SHL, DSH, LIB, GEN, DET, ADD, EDT, MNU, DEL, PIC, SET). "LIB-3" means requirement 3 of the Library screens. Careful with the two similar codes: GNR is the onboarding genres step (03), GEN is the library Genres tab (12). Use these IDs when you write Jira tasks so every task traces back here.
+> **Frames 18 to 25 were added after the first version of this spec.** They design sign in and account creation, including eight field-level error states. That retires assumption A1 (no authentication) and A30 (no error visuals anywhere), and it makes this a multi-user app. Sections 1, 3, 4, 5, 2.1 and 6 were revised accordingly, and sections 2.14 and 2.15 are new.
+>
+> **How to read requirement IDs:** each screen has a code (WEL, GOL, GNR, SGN, REG, SHL, DSH, LIB, GEN, DET, ADD, EDT, MNU, DEL, PIC, SET). "LIB-3" means requirement 3 of the Library screens. Careful with the two similar codes: GNR is the onboarding genres step (03), GEN is the library Genres tab (12). Use these IDs when you write Jira tasks so every task traces back here.
 >
 > **For students:** read the brief first, then work through this spec screen by screen. Every bolded ID is one requirement your Jira tasks must reference. Section 6 records working decisions where the design is ambiguous: challenge an assumption with your teacher if you disagree, don't silently change it. When the design and your instinct conflict, the design wins.
 
@@ -12,7 +14,9 @@ This spec turns the Figma design into buildable requirements. Every requirement 
 
 **Platform:** desktop web app. Every frame is 1440x1024 with a fixed left sidebar, which is a desktop-first web layout. No mobile or tablet frames exist.
 
-**Suggested architecture:** a single-page web app with four routed views (Dashboard, Library, Picker, Settings) behind a shared app shell, plus modals for title create, edit, and delete. Data is a small store of profile, titles, genres, and picks. The only asynchronous operation the design shows is pick generation, with a visible skeleton loading state (15). The "Sign in" link has no designed screen (A1), so this build has no accounts; a local store or a thin single-user API both satisfy the design.
+**Suggested architecture:** a single-page web app with four routed views (Dashboard, Library, Picker, Settings) behind a shared app shell, plus modals for title create, edit, and delete, plus sign in and account creation screens that sit **outside** the shell. Data is a store of users, profiles, titles, genres, and picks. The only asynchronous operation the design shows is pick generation, with a visible skeleton loading state (15).
+
+**This build has accounts.** Frames 18 to 25 design email and password sign in, account creation with a Terms consent checkbox, and Google as an alternative provider. A local-only store therefore no longer satisfies the design: there is a real backend with a user record, a session, and per-user data scoping. Every title, preference, and derived view belongs to exactly one account, which is why the operations in section 4 are all implicitly per-user.
 
 **Terms used in this spec:**
 
@@ -34,25 +38,25 @@ This spec turns the Figma design into buildable requirements. Every requirement 
 
 ### 2.1 Welcome
 
-**Figma frame:** [01 · Welcome](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3030-1041). **Purpose:** pitch the product and start setup.
+**Figma frame:** [01 · Welcome](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3030-1041). **Purpose:** pitch the product and start setup.
 
 UI elements and behavior:
 
 - **WEL-1.** Show the Scene logo (top left), the overline "TRACK EVERYTHING YOU WATCH", the heading "Every movie and show, in one place.", and the intro "Build your watchlist, rate what you've seen, and let Scene Picker tell you exactly what to watch next."
 - **WEL-2.** Primary button "Get started" opens Setup - Monthly goal (02).
-- **WEL-3.** Caption "Already have an account?" with the link "Sign in". No sign-in screen exists anywhere in the file, so the link stays non-functional until designed (A1).
+- **WEL-3.** Caption "Already have an account?" with the link "Sign in", which opens Sign in (18). This requirement previously recorded the link as a dead end; frame 18 now supplies its destination.
 - **WEL-4.** Right panel is decorative: three tilted poster cards with play glyphs, a "4.5 rated" chip with a star icon, and a "NOW WATCHING / Severance · S2 E4" card with a progress bar. Display only, no interactions designed.
 - **WEL-5.** Footer: "© 2025 Scene · Made for film lovers".
 
 States: default only. No loading, error, or filled variants are designed.
 
-Navigation: entry point is first app launch. Exits: "Get started" → 02; "Sign in" has no destination (A1).
+Navigation: entry point is first app launch. Exits: "Get started" → Create account (21) per A31; "Sign in" → 18.
 
-Edge cases: no identity is captured here or anywhere in onboarding, yet the dashboard greets "Welcome back, Mara" and the sidebar shows a profile. Profile fields live only in Settings (17), so a default profile must exist from first launch (A2).
+Edge cases: onboarding itself captures no identity, but account creation (21) now does, so the name behind "Welcome back, Mara" and the sidebar profile comes from the signed-in account rather than from a preexisting default. That retires A2.
 
 ### 2.2 Setup - Monthly goal
 
-**Figma frame:** [02 · Setup - Monthly goal](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3031-1042). **Purpose:** set the monthly watch goal the profile stores.
+**Figma frame:** [02 · Setup - Monthly goal](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3031-1042). **Purpose:** set the monthly watch goal the profile stores.
 
 UI elements and behavior:
 
@@ -72,7 +76,7 @@ Edge cases: no screen ever compares progress against this goal. The dashboard's 
 
 ### 2.3 Setup - Favorite genres
 
-**Figma frame:** [03 · Setup - Favorite genres](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3032-1044). **Purpose:** capture favorite genres for personalization.
+**Figma frame:** [03 · Setup - Favorite genres](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3032-1044). **Purpose:** capture favorite genres for personalization.
 
 UI elements and behavior:
 
@@ -92,7 +96,7 @@ Edge cases: onboarding offers 12 genres but the library's Genres tab shows only 
 
 ### 2.4 Dashboard (filled and empty)
 
-**Figma frames:** [04 · Dashboard](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3011-2), [05 · Dashboard - Empty](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3027-987). **Purpose:** show the month at a glance and route to logging, the library, and the Picker.
+**Figma frames:** [04 · Dashboard](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3011-2), [05 · Dashboard - Empty](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3027-987). **Purpose:** show the month at a glance and route to logging, the library, and the Picker.
 
 Shared shell (also applies to Library, Picker, Settings):
 
@@ -124,7 +128,7 @@ Edge cases visible or implied: dash placeholders when no ratings exist (05), the
 
 ### 2.5 Library - List and empty state
 
-**Figma frames:** [06 · Library](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3020-57), [13 · Library - Empty](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3024-851). **Purpose:** the full log of tracked titles.
+**Figma frames:** [06 · Library](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3020-57), [13 · Library - Empty](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3024-851). **Purpose:** the full log of tracked titles.
 
 Header and controls:
 
@@ -152,7 +156,7 @@ Edge cases: a search with zero matches has no designed state (A14); the same gen
 
 ### 2.6 Library - Genres tab
 
-**Figma frame:** [12 · Genres](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3024-682). **Purpose:** the library grouped by genre.
+**Figma frame:** [12 · Genres](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3024-682). **Purpose:** the library grouped by genre.
 
 - **GEN-1.** Same page header; "Genres" tab active. The search, status, and sort controls are replaced by a secondary "New genre" button on the right of the tab row.
 - **GEN-2.** Eight genre cards in two columns, each with a colored icon tile, name, title count, a kebab, and a one-line descriptor: "Sci-Fi, 8 titles, Space, time, and everything after."; "Drama, 6 titles, Character-driven, awards-season bait."; "Comedy, 5 titles, Light watches for tired nights."; "Action, 5 titles, Explosions, chases, and set-pieces."; "Thriller, 4 titles, Edge-of-seat, twist-heavy plots."; "Romance, 3 titles, Love stories and slow burns."; "Documentary, 3 titles, Real stories worth knowing."; "Horror, 2 titles, Watch with the lights on."
@@ -168,7 +172,7 @@ Edge cases: what happens to a card when its last title is deleted follows A7 (ca
 
 ### 2.7 Title detail
 
-**Figma frame:** [07 · Title detail](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3021-159). **Purpose:** one title in full, with the route to editing.
+**Figma frame:** [07 · Title detail](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3021-159). **Purpose:** one title in full, with the route to editing.
 
 - **DET-1.** Breadcrumb "Library / Dune: Part Two" with a back arrow returns to Library (06). Header action "Edit details" opens the Edit title modal (09).
 - **DET-2.** Main card: poster, overline "SCI-FI · MOVIE", title "Dune: Part Two", meta "2024 · 2h 46m · Directed by Denis Villeneuve", a green "Watched" badge next to a filled favorite heart, and the rating row "4.5 / 5" with five stars.
@@ -186,7 +190,7 @@ Edge cases: hide the note section when a title has no note and show the dash pat
 
 ### 2.8 Add title (modal)
 
-**Figma frame:** [08 · Add title](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3023-222). **Purpose:** log a movie or show manually.
+**Figma frame:** [08 · Add title](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3023-222). **Purpose:** log a movie or show manually.
 
 - **ADD-1.** Modal over the current page (mocked over Library) titled "Add title" with an X close button.
 - **ADD-2.** Fields, top to bottom: "Title" (text, filled "Dune: Part Two" in the mock), "Type" (select, "Movie") and "Genre" (select, "Sci-Fi") side by side, "Status" (select, "Watched") and "Watch date" (date, "Oct 12, 2024") side by side, "Rating" (five-star input showing "4.5 / 5"), "Note" (textarea, placeholder "Add a note or first impression..."), and a "Mark as favorite" toggle with the caption "Show this title in your favorites" (on in the mock).
@@ -208,7 +212,7 @@ Edge cases: a title with watch date in a previous month must land in that month'
 
 ### 2.9 Edit title (modal)
 
-**Figma frame:** [09 · Edit title](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3023-637). **Purpose:** correct an existing title.
+**Figma frame:** [09 · Edit title](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3023-637). **Purpose:** correct an existing title.
 
 - **EDT-1.** Same form as Add title, titled "Edit title", prefilled with the title's values (mock: "Dune: Part Two", "Movie", "Sci-Fi", "Watched", "Oct 12, 2024", "4.5 / 5", favorite on).
 - **EDT-2.** Footer adds a danger text action "Delete title" with a trash icon on the left, which opens Delete confirmation (11). Buttons: "Cancel" and primary "Save changes" (persists edits, closes, refreshes list, detail, dashboard, and genre counts).
@@ -219,14 +223,14 @@ Navigation: opens from the Row menu "Edit details" (10) and from Title detail "E
 
 ### 2.10 Row menu
 
-**Figma frame:** [10 · Row menu](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3023-1059). **Purpose:** quick actions on one title without opening it.
+**Figma frame:** [10 · Row menu](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3023-1059). **Purpose:** quick actions on one title without opening it.
 
 - **MNU-1.** The kebab button on a library row opens a small menu anchored to the row with three items: "Edit details" (pencil icon), "Mark as watched" (check-circle icon), and "Delete title" (trash icon, danger color).
 - **MNU-2.** "Edit details" opens the Edit title modal (09) for that title. "Mark as watched" sets the title's status to "Watched" and refreshes the row chip and dashboard stats; the menu is mocked on a "Watching" row and the same menu on an already-watched row is assumption A22. "Delete title" opens Delete confirmation (11). The menu closes on outside click or Escape (A22).
 
 ### 2.11 Delete confirmation
 
-**Figma frame:** [11 · Delete confirmation](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3023-1434). **Purpose:** prevent accidental permanent deletion.
+**Figma frame:** [11 · Delete confirmation](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3023-1434). **Purpose:** prevent accidental permanent deletion.
 
 - **DEL-1.** Modal with a coral trash icon, title "Delete this title?", and body copy quoting the title name: "'Dune: Part Two' and its rating, note, and watch history will be permanently removed. This can't be undone."
 - **DEL-2.** Buttons: "Cancel" (closes, nothing happens) and danger primary "Delete title" (deletes the title, closes, refreshes the list).
@@ -236,7 +240,7 @@ Navigation: opens from the Row menu (10) and from the Edit modal's "Delete title
 
 ### 2.12 Scene Picker (empty, generating, picks)
 
-**Figma frames:** [14 · Picker](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3025-778), [15 · Picker - Generating](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3025-904), [16 · Picker - Empty](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3025-1057). **Purpose:** turn the library, ratings, and tonight's mood into three picks.
+**Figma frames:** [14 · Picker](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3025-778), [15 · Picker - Generating](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3025-904), [16 · Picker - Empty](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3025-1057). **Purpose:** turn the library, ratings, and tonight's mood into three picks.
 
 Header:
 
@@ -267,7 +271,7 @@ Edge cases: regenerating replaces all three picks; the dashboard teaser must alw
 
 ### 2.13 Settings
 
-**Figma frame:** [17 · Settings](https://www.figma.com/design/i6yFe3BHJaGOe8MSK9BtTK/Movie---Watchlist-Tracker?node-id=3026-922). **Purpose:** edit the profile and watch preferences.
+**Figma frame:** [17 · Settings](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3026-922). **Purpose:** edit the profile and watch preferences.
 
 - **SET-1.** Header: overline "Account", title "Settings".
 - **SET-2.** Card "Profile": avatar circle with initials "MK" and a "Change photo" button (no upload flow is designed, A28); inputs "First name" ("Mara"), "Last name" ("Kovač"), "Email" ("mara@email.com").
@@ -282,17 +286,78 @@ States: default only.
 
 Navigation: entry from sidebar "Settings". No exit button; navigation happens via the sidebar.
 
+### 2.14 Sign in
+
+**Figma frames:** [18 · Sign in](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3069-1082), [19 · Sign in - Wrong password](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3072-1090), [20 · Sign in - Email not found](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3072-1113). **Purpose:** let a returning person back into their account.
+
+UI elements and behavior:
+
+- **SGN-1.** Centred card on the canvas background, outside the app shell: Scene logo, heading "Sign in", supporting copy "Pick up where you left off.", and labelled Email and Password fields. The password is masked.
+- **SGN-2.** Primary button "Sign in" authenticates and opens the Dashboard.
+- **SGN-3.** Link "Forgot password?", right-aligned under the Password field. No reset screen exists anywhere in the file, so the link stays non-functional until designed (A32).
+- **SGN-4.** Wrong password (19): the Password field takes a danger border and the message "Wrong password. Try again or reset it." appears directly below it.
+- **SGN-5.** Email not found (20): the Email field takes a danger border and the message "No account found for this email." appears directly below it.
+- **SGN-6.** An "or" divider, then the secondary button "Continue with Google" (A33).
+- **SGN-7.** Footer caption "New here?" with the link "Create an account" → 21.
+- **SGN-8.** Signing out returns here. No sign-out control is designed anywhere in the file (A36).
+
+Validation implied by the design: both fields are required. The two failure modes are deliberately distinguishable, because SGN-4 and SGN-5 specify different copy. That discloses whether an email is registered, which is a security trade-off to confirm with the designer rather than silently collapse into one generic message.
+
+States: default (18), wrong password (19), email not found (20). No loading state is designed.
+
+Navigation: entry from Welcome "Sign in" (WEL-3) and from Create account "Sign in" (REG-10). Exits: successful sign in → 04/05, "Create an account" → 21.
+
+Edge cases: a signed-in person opening this screen directly should land on the Dashboard rather than see the form again. Not designed; working decision.
+
+### 2.15 Create account
+
+**Figma frames:** [21 · Create account](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3073-1106), [22 · Email registered](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3074-1117), [23 · Weak password](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3074-1156), [24 · Terms not accepted](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3074-1195), [25 · Name missing](https://www.figma.com/design/drANL1Q2GjcKiLQ5hDwaRP/Movie-Watchlist-Tracker?node-id=3074-1234). **Purpose:** create the account every other screen depends on.
+
+UI elements and behavior:
+
+- **REG-1.** Centred card outside the app shell: Scene logo, heading "Create your account", supporting copy "Start tracking what you want to watch.", and labelled Name, Email and Password fields.
+- **REG-2.** Helper text "At least 8 characters." in muted style below the Password field.
+- **REG-3.** Consent checkbox reading "I agree to the Terms and Privacy Policy", with Terms and Privacy Policy styled as links. Neither has a designed destination (A34).
+- **REG-4.** Primary button "Create account" creates the account and enters onboarding (A31).
+- **REG-5.** Email already registered (22): the Email field takes a danger border and "This email is already registered. Sign in instead?" appears below it.
+- **REG-6.** Password too short (23): the Password field takes a danger border and "Password must be at least 8 characters." **replaces** the REG-2 helper text rather than stacking under it.
+- **REG-7.** Terms not accepted (24): the checkbox is unchecked and "Please accept the Terms to continue." appears below the consent row.
+- **REG-8.** Name missing (25): the Name field takes a danger border and "Enter your name." appears below it.
+- **REG-9.** An "or" divider, then the secondary button "Continue with Google" (A33).
+- **REG-10.** Footer caption "Already have an account?" with the link "Sign in" → 18.
+- **REG-11.** This screen captures a single **Name** field, while Settings (17) has separate First name and Last name. The two disagree (A35).
+
+Validation implied by the design: Name, Email, Password and the consent checkbox are all required. Password minimum is 8 characters, taken from REG-2 and REG-6. No other password rule is designed, so complexity requirements must not be invented. Errors attach to the specific field that failed; each of frames 22 to 25 mocks one error alone, so the several-errors-at-once case is a working decision.
+
+States: default (21), plus the four error states (22 to 25). No loading state is designed.
+
+Navigation: entry from Welcome "Get started" (A31) and from Sign in "Create an account" (SGN-7). Exits: success → Setup - Monthly goal (02), "Sign in" → 18.
+
+Edge cases: whether a person arriving through Google still walks through the two Setup steps is not designed (A33).
+
 ## 3. Data model
 
 Entities and fields implied by the screens. Names are suggestions, fields are evidence-based.
 
-**Profile** (implied by 17, 02, 03, sidebar and greeting on every view)
+**Everything below belongs to exactly one User.** Titles, profile data and picks are all per-account, and no query may reach across accounts.
+
+**User** (implied by 18 to 25)
 
 | Field | Type | Evidence |
 |---|---|---|
-| firstName | string | 17 "First name", "Welcome back, Mara" (04/05) |
-| lastName | string | 17 "Last name", "Mara K." sidebar footer |
-| email | string | 17 "Email", sidebar footer |
+| email | string, unique | 18 "Email", 21 "Email", REG-5 rejects duplicates |
+| passwordHash | string | 18 and 21 Password fields; never stored in plain text |
+| authProvider | enum: password, google | "Continue with Google" (18, 21), A33 |
+| termsAcceptedAt | timestamp | REG-3 consent checkbox, REG-7 blocks without it |
+| createdAt | timestamp | implied by account creation |
+
+**Profile** (implied by 17, 02, 03, 21, sidebar and greeting on every view)
+
+| Field | Type | Evidence |
+|---|---|---|
+| firstName | string | 17 "First name", "Welcome back, Mara" (04/05); derived from the single Name field on 21 per A35 |
+| lastName | string | 17 "Last name", "Mara K." sidebar footer; see A35 |
+| email | string | 17 "Email", sidebar footer, 18 and 21; the same value the account signs in with |
 | avatarInitials | derived from names | "MK" avatar (17, sidebar); photo upload isn't designed (A28) |
 | monthlyWatchGoal | number | 02 stepper "15 titles / month", 17 "Monthly watch goal" |
 | defaultType | enum: movie, series | 17 "Default type" |
@@ -342,10 +407,14 @@ Aggregates (all derived from titles, never stored): monthly watched count and de
 
 ## 4. API surface
 
-Functional operations each screen needs. Not final API design. With no accounts designed (A1), these can be a local storage layer or a thin single-user API; the operations are the same either way.
+Functional operations each screen needs. Not final API design. **Every operation below is scoped to the signed-in account**, and every one of them requires an authenticated session except the three sign-in and sign-up operations themselves.
 
 | Operation | Kind | Used by |
 |---|---|---|
+| signIn(email, password) | create session | 18 (SGN-2) |
+| signUp(name, email, password, consent) | create | 21 (REG-4) |
+| signInWithGoogle() | create session | 18, 21 (SGN-6, REG-9) |
+| signOut() | delete session | sidebar footer (SGN-8, A36) |
 | getProfile() | read | shell (SHL-1), greeting (SHL-2), 17 |
 | updateProfile(fields) | update | 17 |
 | setMonthlyGoal(titlesPerMonth) | update | 02, 17 |
@@ -363,24 +432,26 @@ Functional operations each screen needs. Not final API design. With no accounts 
 | addPickToWatchlist(pickId) | create | 14 (PIC-7) |
 | dismissPick(pickId) | update | 14 (PIC-7) |
 
-Operations that deliberately do not exist: signIn and signUp (the "Sign in" link is a dead end, A1), any playback operation ("Resume" has no player, A10), createGenre and editGenre ("New genre" and the card kebab are dead ends, A24), uploadAvatar ("Change photo" is a dead end, A28), and notification delivery (A28). Derived views recompute whenever createTitle, updateTitle, markAsWatched, toggleFavorite, or deleteTitle succeed: dashboard stats and activity, the up-next queue, genre counts, and Picker gating (A23).
+Operations that deliberately do not exist: password reset ("Forgot password?" is a dead end, A32), any playback operation ("Resume" has no player, A10), createGenre and editGenre ("New genre" and the card kebab are dead ends, A24), uploadAvatar ("Change photo" is a dead end, A28), and notification delivery (A28). Derived views recompute whenever createTitle, updateTitle, markAsWatched, toggleFavorite, or deleteTitle succeed: dashboard stats and activity, the up-next queue, genre counts, and Picker gating (A23).
 
 ## 5. Non-functional notes
 
 Only what the design implies:
 
 - **Localization:** English only, one language across all frames. US date formats ("Oct 12, 2024"). Runtimes as "2h 46m".
-- **Async and loading:** the only designed loading state is pick generation (15: "Generating...", skeleton cards). No spinners, offline, or error states exist anywhere else, so screen loads are expected to be instant.
-- **Accessibility observations:** status is never encoded by color alone (chips carry text plus a dot); genre dots are always paired with the genre name. The FAV column is icon-only hearts and needs an accessible label. Form fields all have visible labels. Focus, hover, and keyboard states aren't designed; the star-rating input (08), toggles (08, 17), and mood chips (14) need keyboard support decisions.
+- **Async and loading:** the only designed loading state is pick generation (15: "Generating...", skeleton cards). No spinner is designed for sign in, account creation or the Google redirect, even though all three are network round trips. Screen loads are otherwise expected to be instant.
+- **Error handling:** the authentication screens (19, 20, 22 to 25) are the only designed error visuals in the file, and they establish the pattern for the whole app: a danger border on the offending field plus a short message directly below it. Every other form (Add title, Edit title, Settings) reuses that treatment rather than inventing one. No page-level or network-failure state is designed anywhere.
+- **Security observations:** sign in is by email, so changing an email in Settings changes a credential (A35 area, see section 2.13). SGN-4 and SGN-5 deliberately reveal whether an email is registered. Neither reauthentication nor email verification is designed.
+- **Accessibility observations:** status is never encoded by color alone (chips carry text plus a dot); genre dots are always paired with the genre name. The FAV column is icon-only hearts and needs an accessible label. Form fields all have visible labels, including on 18 and 21. Field errors must be programmatically associated with their field. Focus, hover, and keyboard states aren't designed; the star-rating input (08), toggles (08, 17, 21), and mood chips (14) need keyboard support decisions.
 - **Responsiveness:** all frames are fixed 1440x1024 desktop. No breakpoints designed.
 - **Visual system:** the Foundations page is explicitly dark theme only, with surface tokens (canvas #0F1216, sidebar, card, raised, elevated, muted), a crimson accent, status tones (success green, warning amber, danger red, each with text and soft variants), and an eight-slot genre palette (crimson, amber, green, teal, blue, indigo, purple, pink). The Components page defines Button (primary/secondary/danger), Tag/Status, Section header, Input and Select fields, Stat, List row, Rating (0 to 5), Progress bar, Favorite toggle, Genre chip, Mood chip, and the Sidebar. Build these as shared components, they repeat across screens.
 
 ## 6. Assumptions log
 
-Numbered so teachers can review each one:
+Numbered so teachers can review each one. Three are **retired**: they were written when the file had 17 frames and frames 18 to 25 answered them.
 
-- **A1.** "Sign in" (01) has no designed screen. The link stays non-functional and this build has no authentication.
-- **A2.** No screen captures identity during onboarding, yet the app greets "Mara" and shows a profile in the sidebar. A default local profile exists from first launch and is edited only in Settings (17). How "Mara" got there is the designer's to answer.
+- **A1. RETIRED.** Said "Sign in" (01) had no designed screen and this build had no authentication. Frame 18 exists, so it does. See sections 2.14 and 2.15.
+- **A2. RETIRED.** Said a default local profile had to exist from first launch, because nothing captured identity. Account creation (21) captures it. The name in the greeting and the sidebar comes from the signed-in account.
 - **A3.** "Back" moves one step (02 → 01, 03 → 02) and preserves values already entered.
 - **A4.** The goal stepper (02) has no designed bounds. Working decision: whole numbers 1 to 99, step 1, default 15; Settings (17) uses the same bounds.
 - **A5.** The monthly goal is never compared to progress anywhere: the "WATCHED IN OCTOBER" card (04) shows a plain count. Build as designed and flag the gap with the designer.
@@ -408,4 +479,10 @@ Numbered so teachers can review each one:
 - **A27.** Generation (15) has no cancel and no designed failure state: on failure keep the previous picks. The unlock threshold ("a few titles", 16; "added and rated a few titles", 05) isn't designed; working decision: the Picker unlocks once 3 titles are rated; confirm with the designer.
 - **A28.** Settings dead ends (17): "Change photo" has no upload flow (initials remain); "Manage genres" is assumed to open the Genres tab (12); "New release reminders" is a stored preference with no notification system behind it; "Save changes" persists silently with no designed success state.
 - **A29.** Where screens conflict, each follows its own mock until the designer resolves it: "14 this month" activity vs "12 titles" watched (04); watched titles sitting in the up-next rail (04 vs 06); the saved note on 07 vs the empty Note field on 09; the same genre with different dot colors on 06 (Comedy amber vs pink, Drama blue vs teal); and genre-card counts totaling 36 (12) vs the 10-row list (06). Mock numbers are illustrative: displayed values must be computed from real data.
-- **A30.** No form error or validation visuals exist anywhere in the file. Use simple inline messages and confirm the pattern with the designer.
+- **A30. RETIRED.** Said no form error or validation visuals existed anywhere in the file. Frames 19, 20 and 22 to 25 design eight of them, and they set the pattern every other form reuses: danger border on the field plus a message directly below it. See "Error handling" in section 5.
+- **A31.** The design never shows how Welcome (01) reaches account creation. "Get started" goes to Setup (02) and "Sign in" goes to 18, but nothing points at 21. Working decision: "Get started" opens Create account (21), and the two Setup steps follow successful creation. This changes the first thing every new user sees, so confirm it.
+- **A32.** "Forgot password?" (18) has no designed screen. The link stays non-functional until designed, exactly as "Sign in" used to be.
+- **A33.** "Continue with Google" (18, 21) has no designed consent screen, no callback screen and no loading state. Two open questions: what the user sees while the redirect resolves, and whether a Google user still walks through the two Setup steps.
+- **A34.** The "Terms" and "Privacy Policy" links in the consent row (21) have no destinations anywhere in the file.
+- **A35.** Create account captures one **Name** field (REG-11) while Settings has **First name** and **Last name** (SET-2). Working decision: split the entered name on the first space and store two values. Confirm, since the alternative is one name field everywhere.
+- **A36.** No sign-out control is designed anywhere: Settings (17) has no such button and the sidebar profile footer has no menu. The app can be entered but not left, which makes authentication untestable end to end. Working decision: put the control in the sidebar profile footer. This is the one place in the build not backed by a frame.
