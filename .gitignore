@@ -24,6 +24,9 @@ Thumbs.db
 .mcp.json
 .claude/settings.local.json
 
+# neonctl local state — records which features `neon init` set up on this machine
+.neon
+
 # Logs
 *.log
 npm-debug.log*

@@ -39,8 +39,7 @@ so this stays safe.
 
 ## What works today
 
-Exactly one thing, on purpose, so you can see the whole path from browser to API without
-reading a lot of code:
+**The greeting.** The simplest possible path from browser to API:
 
 ```text
 browser  ->  Next.js page (:4200)  ->  fetch on the server  ->  NestJS (:3000)
@@ -55,6 +54,28 @@ them first.
 
 If the backend is not running, the page says so instead of crashing, which is a useful
 thing to notice: the frontend handles the failure rather than pretending it cannot happen.
+
+**Accounts, and a database.** Sign-up and sign-in run on Neon Auth, and the API verifies
+who you are without ever seeing your session cookie:
+
+```text
+browser  ->  Next.js (:4200)  ->  /api/auth/*  ->  Neon Auth
+                                                   sets a session cookie
+             Next.js server    ->  /api/auth/token
+                                                   mints a short-lived JWT
+                              ->  NestJS (:3000)   Authorization: Bearer <jwt>
+                                  GET /api/me      verifies it against Neon's JWKS
+```
+
+Why the extra hop: auth lives in the frontend, but the API is a **separate origin** on
+another port, so it never receives the cookie. The frontend exchanges the session for a
+JWT and sends that instead. The backend trusts nothing but a signature it can check
+against Neon's public keys.
+
+Try it: **<http://localhost:4200/auth/sign-up>**, then **<http://localhost:4200/me>**. That
+page shows the user id, email, and a live database ping, all returned by NestJS after it
+verified your token. See [`backend/src/auth/neon-auth.guard.ts`](backend/src/auth/neon-auth.guard.ts)
+and [`frontend/src/app/me/page.tsx`](frontend/src/app/me/page.tsx).
 
 ## Prerequisites
 
@@ -129,8 +150,11 @@ cd frontend && npm install && cp .env.example .env.local && cd ..
 > lint-staged and Prettier, and its `prepare` script is what installs the hooks. Skip it
 > and your commits silently bypass every check the project relies on.
 
-Both `.env` copies are optional: each app falls back to sensible localhost defaults. Copy
-them anyway so you can see which variables exist.
+> **The `.env` files are no longer optional.** They used to be, back when the only
+> variables were ports. The backend now needs real Neon connection strings and the
+> frontend needs the Neon Auth base URL, so **go and fill them in now**: see
+> [Database and auth](#database-and-auth) below. Without them the backend fails on its
+> first database call and sign-in does not work at all.
 
 Now run both apps, each in its **own terminal**:
 
@@ -157,25 +181,115 @@ curl http://localhost:3000/api/hello
 Note the `/api` part. `http://localhost:3000/` on its own returns **404**, and that is
 correct, not a broken server. See "Gotchas" below.
 
+## Database and auth
+
+The database is **Neon** (serverless Postgres), the ORM is **Prisma**, and authentication
+is **Neon Auth**, which is Neon's managed [Better Auth](https://www.better-auth.com/). All
+three live in one Neon project, so setting up the database sets up auth too.
+
+### Getting the credentials
+
+Everything below is read-only against Neon and safe to re-run.
+
+```bash
+# Log in (opens a browser).
+npx neonctl auth
+
+# Find the project id.
+npx neonctl projects list
+
+# The two connection strings. NEVER paste these into a tracked file.
+npx neonctl connection-string --project-id <project-id> --pooled   # -> DATABASE_URL
+npx neonctl connection-string --project-id <project-id>            # -> DATABASE_URL_UNPOOLED
+
+# The auth endpoints.
+npx neonctl neon-auth status --project-id <project-id>
+```
+
+That last command prints a **JWKS URL**. Put it in `backend/.env` as
+`NEON_AUTH_JWKS_URL`, and the **Base URL** in `frontend/.env.local` as
+`NEON_AUTH_BASE_URL`. Then generate a cookie secret, which must be at least 32
+characters:
+
+```bash
+openssl rand -base64 32     # -> NEON_AUTH_COOKIE_SECRET in frontend/.env.local
+```
+
+### Two connection strings, and why you cannot mix them up
+
+This is the single most common way to break a Neon setup.
+
+| Variable                | Endpoint                   | Used by                         |
+| ----------------------- | -------------------------- | ------------------------------- |
+| `DATABASE_URL`          | pooled, host has `-pooler` | the running application         |
+| `DATABASE_URL_UNPOOLED` | direct, host has no suffix | migrations, bulk import scripts |
+
+The pooled endpoint goes through PgBouncer in transaction mode, which **discards prepared
+statements between transactions**. Migration tooling depends on them, so migrating over the
+pooled URL fails in ways that look like random SQL errors rather than a config mistake.
+[`backend/prisma.config.ts`](backend/prisma.config.ts) points Prisma Migrate at the direct
+URL for exactly this reason.
+
+### Applying migrations
+
+From `backend/`:
+
+```bash
+npm run db:migrate                 # create + apply a migration in development
+npm run db:migrate -- --name add_titles   # name it
+npm run db:migrate:status          # what has been applied
+npm run db:migrate:deploy          # apply existing migrations without creating one (CI, prod)
+npm run db:studio                  # browse the data in a GUI
+```
+
+`npm install` runs `prisma generate` automatically via `postinstall`, so the Prisma Client
+is always present after an install. You never commit generated client code.
+
+### What Prisma does and does not own
+
+Prisma manages the **`public`** schema only. Neon Auth owns the **`neon_auth`** schema
+(`user`, `session`, `account`, `jwks`, and more) and manages it itself, so it is
+deliberately absent from
+[`backend/prisma/schema.prisma`](backend/prisma/schema.prisma). A migration must never try
+to create or drop those tables.
+
+That is why `Profile.userId` is a plain string rather than a foreign key: the user lives in
+another schema Prisma does not manage, and the verified JWT already tells us who is asking,
+so no join is needed to know the caller's identity.
+
 ## Project structure
 
 ```text
 backend/                  NestJS 11 API on :3000
+  prisma/
+    schema.prisma         Models. Prisma owns `public`, never `neon_auth`
+    migrations/           Generated SQL, committed, applied in order
+  prisma.config.ts        Prisma 7 CLI config: points Migrate at the DIRECT URL
   src/
     main.ts               Bootstrap: global 'api' prefix, CORS, port
-    app.module.ts         Root module, registers ConfigModule
-    app.controller.ts     GET /api/hello
+    app.module.ts         Root module: ConfigModule, PrismaModule, AuthModule
+    app.controller.ts     GET /api/hello, GET /api/health/db
     app.service.ts        Business logic + the HelloResponse contract
     app.controller.spec.ts
+    prisma/               PrismaService (global): the client, plus ping()
+    auth/                 NeonAuthGuard (JWT via JWKS), @CurrentUser, GET /api/me
   test/                   Supertest e2e specs
   .env.example
 
 frontend/                 Next.js 16 (App Router) + React 19 on :4200
-  src/app/
-    layout.tsx            Root layout
-    page.tsx              Home route, async Server Component, fetches the API
-    page.test.tsx         React Testing Library example
-    globals.css           Tailwind v4 entry
+  src/
+    lib/auth/
+      server.ts           Server-side Neon Auth. Holds the cookie secret
+      client.ts           Browser auth client
+    app/
+      layout.tsx          Root layout, wraps the app in Providers
+      providers.tsx       Client boundary for NeonAuthUIProvider
+      page.tsx            Home route, async Server Component, fetches the API
+      page.test.tsx       React Testing Library example
+      api/auth/[...path]/  Proxies every auth call to Neon, server-side
+      auth/[path]/        Sign-in, sign-up and the rest, one dynamic route
+      me/                 Proves the whole auth chain end to end
+      globals.css         Tailwind v4 entry
   .env.example
 
 .claude/                  Claude Code skills, agents and permissions
@@ -203,6 +317,16 @@ Run these from inside the app directory, never from the repo root.
 | E2E tests           | `npm run test:e2e`     | not set up               |
 | Coverage            | `npm run test:cov`     | not set up               |
 
+Database commands, backend only:
+
+| Command                     | Purpose                                                   |
+| --------------------------- | --------------------------------------------------------- |
+| `npm run db:migrate`        | Create and apply a migration in development               |
+| `npm run db:migrate:deploy` | Apply existing migrations without creating one (CI, prod) |
+| `npm run db:migrate:status` | Show which migrations have been applied                   |
+| `npm run db:generate`       | Regenerate Prisma Client (also runs on `npm install`)     |
+| `npm run db:studio`         | Browse and edit data in a GUI                             |
+
 Both apps use Jest, so `npm test` runs once and exits. To filter:
 `npm test -- page` by path, `npm test -- -t "greeting"` by test name.
 
@@ -211,21 +335,36 @@ Neither app has a `typecheck` script. `npm run build` is the typecheck, because 
 
 ## Environment variables
 
-| App      | Template                | Your local file       | Variables                                                            |
-| -------- | ----------------------- | --------------------- | -------------------------------------------------------------------- |
-| Backend  | `backend/.env.example`  | `backend/.env`        | `PORT` (3000), `FRONTEND_URL` (CORS origin, `http://localhost:4200`) |
-| Frontend | `frontend/.env.example` | `frontend/.env.local` | `BACKEND_URL` (`http://localhost:3000`)                              |
+Nest reads `backend/.env`, Next.js reads `frontend/.env.local`. Both are gitignored and
+must never be committed. Only the `.env.example` templates are.
 
-Note the filename difference: Nest reads `.env`, Next.js reads `.env.local`. Both are
-gitignored and must never be committed. Only the `.env.example` templates are.
+**Backend** (`backend/.env`, from `backend/.env.example`):
+
+| Variable                | Purpose                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| `PORT`                  | API port, default 3000                                       |
+| `FRONTEND_URL`          | CORS origin, default `http://localhost:4200`                 |
+| `DATABASE_URL`          | Neon **pooled** connection string. The application uses this |
+| `DATABASE_URL_UNPOOLED` | Neon **direct** connection string. Migrations use this       |
+| `NEON_AUTH_JWKS_URL`    | Public keys the API verifies bearer tokens against           |
+| `TMDB_API_READ_TOKEN`   | TMDB v4 read token, for the Scene Picker catalogue import    |
+
+**Frontend** (`frontend/.env.local`, from `frontend/.env.example`):
+
+| Variable                  | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| `BACKEND_URL`             | Where to reach the API, default `http://localhost:3000` |
+| `NEON_AUTH_BASE_URL`      | Your Neon Auth instance                                 |
+| `NEON_AUTH_COOKIE_SECRET` | Signs session cookies. **32+ characters**               |
 
 **One rule worth memorising:** in Next.js, a variable prefixed `NEXT_PUBLIC_` is inlined
-into the JavaScript sent to the browser, so it is public forever. `BACKEND_URL` has no
-such prefix because it is read on the server. Never put a secret behind
-`NEXT_PUBLIC_`.
+into the JavaScript sent to the browser, so it is public forever. Nothing in either table
+above carries that prefix, and `NEON_AUTH_COOKIE_SECRET` and `TMDB_API_READ_TOKEN` are the
+two where a slip would matter most. Never put a secret behind `NEXT_PUBLIC_`.
 
 There is no config validation yet, so a missing variable fails when it is first used
-rather than at startup.
+rather than at startup. `NEON_AUTH_JWKS_URL` is the clearest example: the API boots fine
+without it and only fails on the first authenticated request.
 
 ## Git workflow
 
@@ -403,16 +542,21 @@ for the two supported setups and their trade-offs.
 
 ## Gotchas
 
-| Symptom                                                   | Cause                                                                                                                                                |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `http://localhost:3000/` returns 404                      | Correct. A global `api` prefix means the route is `/api/hello`. The prefix is set once in `backend/src/main.ts`                                      |
-| Page says "Could not reach the API"                       | The backend is not running, or not on 3000                                                                                                           |
-| `node: command not found`, but it worked via the AI agent | Claude Code can ship its own bundled Node, which your terminal does not see. Install Node yourself, see [Prerequisites](#prerequisites)              |
-| Servers die as soon as the AI assistant finishes          | Expected. Processes an assistant starts belong to its session. Start `npm run start:dev` and `npm run dev` in your own terminals and leave them open |
-| Commits go through with no lint or message check          | You skipped the root `npm install`, so the hooks were never installed. Check with `git config core.hooksPath`, which should print `.husky/_`         |
-| ESLint cannot find its config                             | You ran it from the repo root. Each app's ESLint runs from that app's directory                                                                      |
-| Ports look backwards                                      | They are asymmetric on purpose: backend **3000**, frontend **4200**. Both are wired into code and config, so do not swap them                        |
-| Port already in use                                       | A dev server from an earlier session. `lsof -nP -iTCP:3000 -sTCP:LISTEN` on macOS/Linux, `netstat -ano \| findstr :3000` on Windows                  |
+| Symptom                                                   | Cause                                                                                                                                                 |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http://localhost:3000/` returns 404                      | Correct. A global `api` prefix means the route is `/api/hello`. The prefix is set once in `backend/src/main.ts`                                       |
+| Page says "Could not reach the API"                       | The backend is not running, or not on 3000                                                                                                            |
+| `node: command not found`, but it worked via the AI agent | Claude Code can ship its own bundled Node, which your terminal does not see. Install Node yourself, see [Prerequisites](#prerequisites)               |
+| Servers die as soon as the AI assistant finishes          | Expected. Processes an assistant starts belong to its session. Start `npm run start:dev` and `npm run dev` in your own terminals and leave them open  |
+| Commits go through with no lint or message check          | You skipped the root `npm install`, so the hooks were never installed. Check with `git config core.hooksPath`, which should print `.husky/_`          |
+| ESLint cannot find its config                             | You ran it from the repo root. Each app's ESLint runs from that app's directory                                                                       |
+| Ports look backwards                                      | They are asymmetric on purpose: backend **3000**, frontend **4200**. Both are wired into code and config, so do not swap them                         |
+| Port already in use                                       | A dev server from an earlier session. `lsof -nP -iTCP:3000 -sTCP:LISTEN` on macOS/Linux, `netstat -ano \| findstr :3000` on Windows                   |
+| Migrations fail with odd SQL or prepared-statement errors | You are migrating over the **pooled** URL. Migrations need `DATABASE_URL_UNPOOLED`. See [Database and auth](#database-and-auth)                       |
+| First database query takes over a second                  | Neon scales to zero, so an idle branch cold-starts. Normal. Never write a test that assumes a fast first connection                                   |
+| `Cannot find module '@prisma/client'` or missing types    | The client is generated, not committed. Run `npm run db:generate` in `backend/`                                                                       |
+| 401 from `/api/me` with a token that looks fine           | Either the token expired (they last ~15 minutes) or `NEON_AUTH_JWKS_URL` is wrong. The guard logs the real reason; the response deliberately does not |
+| Sign-in does nothing, no error                            | `NEON_AUTH_COOKIE_SECRET` is missing or under 32 characters                                                                                           |
 
 ## Where to go from here
 
