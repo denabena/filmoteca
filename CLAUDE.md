@@ -156,9 +156,17 @@ and the session cookie. Because the API is a separate origin it never receives t
 so the frontend mints a short-lived JWT at `/api/auth/token` and sends it as a bearer
 token. `NeonAuthGuard` verifies it against Neon's JWKS and pins `iss` and `aud` to the auth
 instance origin, derived from `NEON_AUTH_JWKS_URL` so there is one variable rather than
-three that could drift. The guard builds its verifier **lazily**: Nest constructs every
-provider at module init, so an eager config read made the whole app unbootable wherever the
-variable was absent, CI included.
+three that could drift.
+
+**Both halves of auth read their config lazily, and skipping that breaks CI in two
+different ways.** `NeonAuthGuard` builds its verifier on first use because Nest constructs
+every provider at module init, so an eager read made the app unbootable wherever the
+variable was absent. On the frontend, `getAuth()` in `src/lib/auth/server.ts` is a lazy
+singleton and the `/api/auth/[...path]` handlers are thin wrappers rather than
+`export const { GET, POST } = auth.handler()`, because **`next build` collects page data for
+every route** and would otherwise construct the auth instance at build time. Both mistakes
+pass locally, since a developer machine has real `.env` files, and fail only in CI. Test the
+real condition: move `backend/.env` or `frontend/.env.local` aside and re-run the build.
 
 **Three Prisma 7 details that will confuse you if you know Prisma 6.** Connection URLs are
 no longer allowed in `schema.prisma` and live in `prisma.config.ts`, which must import

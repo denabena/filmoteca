@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { auth } from '@/lib/auth/server';
+import { getAuth } from '@/lib/auth/server';
 
 /**
  * End-to-end proof that auth spans both apps.
@@ -24,6 +24,7 @@ interface MeResponse {
 }
 
 export default async function MePage() {
+  const auth = getAuth();
   const session = await auth.getSession();
 
   if (!session?.data) {
