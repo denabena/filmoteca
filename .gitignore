@@ -27,6 +27,11 @@ Thumbs.db
 # neonctl local state — records which features `neon init` set up on this machine
 .neon
 
+# Vercel CLI project link, plus the root .env.local it writes with a VERCEL_OIDC_TOKEN.
+# `vercel link` also appends a bare `.env*` here; do not keep it. That pattern would
+# silently swallow the tracked .env.example templates this project documents.
+.vercel
+
 # Logs
 *.log
 npm-debug.log*
