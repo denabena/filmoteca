@@ -1,3 +1,19 @@
+/*
+ * `@neondatabase/auth/ui/css` ships its own **unlayered** Tailwind Preflight,
+ * including `*,:after,:before{margin:0;padding:0}` and
+ * `h1,h2,h3,h4,h5,h6{font-size:inherit}`. Unlayered declarations outrank every
+ * layered one, so importing it raw (as the root layout used to) silently defeats
+ * every padding utility and every heading size in this app, not just on the auth
+ * screens. `layer(neon-auth)` pulls it into a named layer so the normal cascade
+ * applies, while its own components stay styled.
+ *
+ * Order matters twice over, so do not reshuffle these two lines:
+ *   - Both must stay the first rules in the file. A bare `@layer` statement above
+ *     them makes the bundler drop both imports, which removes Tailwind entirely.
+ *   - Layers rank by first appearance, so the vendor import has to come first for
+ *     `utilities` to end up above `neon-auth`.
+ */
+@import '@neondatabase/auth/ui/css' layer(neon-auth);
 @import 'tailwindcss';
 
 /*

@@ -65,20 +65,27 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 flex w-[260px] flex-col justify-between bg-surface-sidebar px-4 pt-[26px] pb-[22px]">
-      <div>
+      {/*
+        The design lays the logo, the section labels and the items out as one
+        column with a uniform 4px gap between every child, so the gap repeats at
+        each nesting level here rather than only between items.
+      */}
+      <div className="flex flex-col gap-1">
         <div className="flex items-center gap-[11px] pb-[26px] pl-2">
           <SceneLogo className="size-[34px] shrink-0" />
-          <span className="font-display text-[20px] font-bold tracking-[-0.2px] text-text-primary">
+          <span className="font-display text-[20px] leading-[normal] font-bold tracking-[-0.2px] text-text-primary">
             Scene
           </span>
         </div>
 
-        <nav aria-label="Main" className="flex flex-col">
+        <nav aria-label="Main" className="flex flex-col gap-1">
           {NAV_SECTIONS.map((section, sectionIndex) => (
-            <div key={section.label}>
+            <div key={section.label} className="flex flex-col gap-1">
               <h2
                 id={`nav-section-${section.label.toLowerCase()}`}
-                className={`pl-2 pb-1.5 text-[11px] font-medium tracking-[0.88px] text-text-tertiary ${
+                // 13px line box, as measured in the design. `normal` computes to
+                // 14 here, and the extra pixel drifts every item below it.
+                className={`pl-2 pb-1.5 text-[11px] leading-[13px] font-medium tracking-[0.88px] text-text-tertiary ${
                   sectionIndex === 0 ? 'pt-0.5' : 'pt-[18px]'
                 }`}
               >
@@ -96,7 +103,7 @@ export function Sidebar() {
                       <Link
                         href={href}
                         aria-current={active ? 'page' : undefined}
-                        className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-medium outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent ${
+                        className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] leading-[normal] font-medium outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent ${
                           active
                             ? 'bg-surface-card-raised text-text-primary [--icon-mask:var(--color-surface-card-raised)]'
                             : 'text-text-secondary [--icon-mask:var(--color-surface-sidebar)] hover:bg-surface-card-raised/40 hover:text-text-primary'
@@ -124,12 +131,12 @@ export function Sidebar() {
       <div className="flex items-center gap-2.5 pt-4 pl-2">
         <span
           aria-hidden="true"
-          className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-surface-elevated text-[12px] font-medium text-text-primary"
+          className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-surface-elevated text-[12px] leading-[normal] font-medium text-text-primary"
         >
           {avatarInitials(profile)}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="truncate text-[13px] font-semibold text-text-primary">
+          <span className="truncate text-[13px] leading-[normal] font-semibold text-text-primary">
             {shortName(profile)}
           </span>
           <span className="truncate text-[11.5px] leading-[1.4] text-text-tertiary">

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
+// globals.css imports the Neon Auth stylesheet itself, into a named cascade
+// layer. Importing it here instead would leave it unlayered, where its Preflight
+// outranks every Tailwind utility in the app. See the comment in globals.css.
 import './globals.css';
-import '@neondatabase/auth/ui/css';
 import { Providers } from './providers';
 
 // Inter carries every text style in the design; Space Grotesk Bold is used only
