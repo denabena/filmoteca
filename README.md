@@ -509,6 +509,109 @@ A repo-wide `prettier --check` step exists but is commented out: 55 files predat
 Prettier config and it would fail on a fresh clone. To turn it on, run
 `npx prettier --write .` once, commit that, then uncomment the step.
 
+## Deployment
+
+Both apps deploy to **one Vercel project** on **one domain** using
+[Vercel Services](https://vercel.com/docs/services), configured in
+[`vercel.json`](vercel.json). JSON cannot hold comments, so the reasoning lives here, the
+same arrangement as `.claude/settings.json` and `.claude/SETTINGS.md`.
+
+> **Services is a gated feature.** Vercel's own docs mark it "Permissions Required:
+> Services". If your account cannot use it, the fallback is two separate Vercel projects
+> with Root Directory set to `frontend` and `backend`, and `BACKEND_URL` pointed at the
+> backend project's URL by hand.
+
+### What the config does
+
+```text
+public internet
+      |
+      v
+  /(.*)  ->  frontend service (Next.js)
+                   |
+                   | service binding, private, never leaves Vercel
+                   v
+             backend service (NestJS)
+```
+
+**The frontend owns every public path.** That is deliberate rather than lazy. The Next.js
+app already serves `/api/auth/*` for Neon Auth, and **routing into a service is final**: if
+a top-level rewrite sent `/api/*` to NestJS, every auth request would hit the backend and
+404 with no fallback. One catch-all to the frontend avoids the whole class of problem.
+
+**The backend has no public route at all.** It does not need one. Every backend call in this
+app is made server-side from a Server Component, never from the browser, so a binding is
+enough:
+
+```json
+"bindings": [
+  { "type": "service", "service": "backend", "format": "url", "env": "BACKEND_URL" }
+]
+```
+
+Vercel injects the backend's URL as `BACKEND_URL`, which is **the exact variable the
+frontend already reads**, so no application code changes between local and deployed. The
+value is deployment-aware, so a preview deployment's frontend talks to that same preview's
+backend. Internal calls also skip CORS entirely, since they never touch the public edge.
+
+**NestJS needs no configuration.** Vercel detects `backend/src/main.ts` as a server
+entrypoint and turns the app into a single Function. Our `main.ts` already has the
+conventional `bootstrap()` calling `app.listen()`, so nothing changed for deployment.
+
+### Environment variables in Vercel
+
+Set these in the Vercel project's settings, not in the repo:
+
+| Variable                  | Service  | Note                                          |
+| ------------------------- | -------- | --------------------------------------------- |
+| `DATABASE_URL`            | backend  | Neon **pooled**                               |
+| `DATABASE_URL_UNPOOLED`   | backend  | Neon **direct**, for migrations               |
+| `NEON_AUTH_JWKS_URL`      | backend  | Token verification                            |
+| `TMDB_API_READ_TOKEN`     | backend  | Catalogue import                              |
+| `FRONTEND_URL`            | backend  | CORS origin. Set to the deployed domain       |
+| `NEON_AUTH_BASE_URL`      | frontend | Your Neon Auth instance                       |
+| `NEON_AUTH_COOKIE_SECRET` | frontend | 32+ chars. Use a **different** one from local |
+
+**Do not set `BACKEND_URL`.** The binding generates and injects it. Setting it by hand is
+the one mistake that will quietly break preview deployments, because a hardcoded value
+cannot point at the right preview.
+
+### Two steps that are easy to forget
+
+**1. Add the deployed domain to Neon Auth.** Sign-in redirects fail until you do, and the
+error does not obviously point at this:
+
+```bash
+npx neonctl neon-auth domain add <your-app>.vercel.app --project-id <project-id>
+npx neonctl neon-auth domain list --project-id <project-id>
+```
+
+**2. Run migrations against production yourself.** Nothing on Vercel applies them. From
+`backend/`, with `DATABASE_URL_UNPOOLED` pointing at production:
+
+```bash
+npm run db:migrate:deploy
+```
+
+Use `db:migrate:deploy`, never `db:migrate`, which is for development and can prompt or
+reset.
+
+### Local parity
+
+`vercel dev` runs both services together with bindings injected, which is the only way to
+exercise the binding locally. The two-terminal setup in [Quick start](#quick-start) is still
+the normal loop; `vercel dev` is for checking the deployment shape.
+
+### If you want the backend publicly reachable
+
+You would add a top-level rewrite for a distinct prefix such as `/api/backend/(.*)`, but be
+aware of the trap: **a service receives the original path.** A request to
+`/api/backend/hello` arrives at NestJS as `/api/backend/hello`, which matches nothing,
+because the global prefix means the route is `/api/hello`. The destination's `path` field
+does not help, as it selects which route runs without changing the path your code sees.
+Fixing it needs a `request.path` transform in the service's own `routes`, or a configurable
+Nest prefix. Not done here because nothing needs it.
+
 ## Working with Claude Code
 
 This repo ships [Claude Code](https://claude.com/claude-code) configuration in
