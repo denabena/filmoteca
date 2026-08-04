@@ -177,11 +177,24 @@ suite. And `prisma.config.ts` is excluded in `tsconfig.build.json`: it sits at t
 root, so including it makes tsc infer that root as the common root and emit
 `dist/src/main.js` instead of `dist/main.js`, silently breaking `start:prod`.
 
-**Jest transforms `jose`.** It ships ESM only, so both jest configs carry
-`transformIgnorePatterns` that exempt it plus an inline `module: commonjs` tsconfig. The
-e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets it run
+**`jose` ships ESM only, and that breaks two different things.** For Jest, both jest configs
+carry `transformIgnorePatterns` exempting it plus an inline `module: commonjs` tsconfig. For
+production, `NeonAuthGuard` must load it with `await import('jose')` rather than a static
+import: this backend compiles to CommonJS, a static import becomes `require()`, and Vercel's
+Node loader cannot `require()` an ES module, so every request died with `ERR_REQUIRE_ESM`.
+**It works locally only because Node 24 supports `require(esm)` and the deployed loader does
+not**, which makes this invisible until deploy. Keep the `jose` import type-only and dynamic;
+verify with `grep "import('jose')" backend/dist/auth/neon-auth.guard.js` after building.
+
+The e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets it run
 with no `backend/.env` at all. Verify that by moving `.env` aside and re-running, because
 CI has no `.env`.
+
+**A pattern worth internalising from all of this: local success proves very little about
+deployment here.** Three separate bugs shipped green locally and failed only in CI or on
+Vercel: eager config reads (fine with a real `.env`, fatal without), the missing services
+`entrypoint` (fine standalone, fatal in services mode), and this ESM require (fine on Node
+24, fatal on the deployed loader). Test the actual failing condition, not the happy one.
 
 **Deployment is one Vercel project, two services, one domain.** `vercel.json` uses
 [Vercel Services](https://vercel.com/docs/services). Two decisions in it are non-obvious and
