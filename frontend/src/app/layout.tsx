@@ -1,11 +1,28 @@
 import type { Metadata } from 'next';
+import { Inter, Space_Grotesk } from 'next/font/google';
+// globals.css imports the Neon Auth stylesheet itself, into a named cascade
+// layer. Importing it here instead would leave it unlayered, where its Preflight
+// outranks every Tailwind utility in the app. See the comment in globals.css.
 import './globals.css';
-import '@neondatabase/auth/ui/css';
 import { Providers } from './providers';
 
+// Inter carries every text style in the design; Space Grotesk Bold is used only
+// for the "Scene" wordmark. Both are variable fonts, so no weight list is needed.
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Decode Academy Demo',
-  description: 'Next.js frontend for the Decode Academy Demo teaching repo.',
+  title: 'Scene',
+  description: 'Every movie and show, in one place.',
 };
 
 export default function RootLayout({
@@ -14,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
       </body>
