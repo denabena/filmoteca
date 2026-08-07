@@ -1,8 +1,17 @@
 {
   "extends": "./tsconfig.json",
-  // prisma.config.ts is excluded because it sits at the package root rather than
-  // under src/. Including it makes tsc infer the package root as the common root
-  // and emit dist/src/main.js instead of dist/main.js, which breaks start:prod.
-  // The Prisma CLI loads that file itself and never needs it compiled.
+  "compilerOptions": {
+    // Pin the output root. Without this, tsc infers it from whatever files the
+    // build happens to include, so a single root-level .ts file silently shifts
+    // every emitted path down one level: dist/src/main.js instead of dist/main.js,
+    // which breaks `start:prod` with a confusing "cannot find module" and no
+    // compile error. Stating it means a stray root-level file fails loudly at
+    // build time instead.
+    "rootDir": "./src"
+  },
+  // prisma.config.ts sits at the package root rather than under src/, and the
+  // Prisma CLI loads it itself, so it never needs compiling. It stays excluded:
+  // with rootDir set, including it is now a build error rather than a silent
+  // relocation of the output.
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma.config.ts"]
 }

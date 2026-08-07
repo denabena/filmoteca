@@ -6,6 +6,10 @@ dist/
 build/
 .next/
 
+# Incremental-build caches. These normally land inside dist/, but running
+# `tsc --noEmit -p tsconfig.build.json` writes one next to the config instead.
+*.tsbuildinfo
+
 # IDE
 .idea/
 .vscode/
