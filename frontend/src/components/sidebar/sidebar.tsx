@@ -6,6 +6,7 @@ import type { ComponentType } from 'react';
 import { useProfile } from '@/components/profile-provider';
 import { avatarInitials, shortName } from '@/lib/current-user';
 import { DashboardIcon, LibraryIcon, PickerIcon, SceneLogo, SettingsIcon } from './icons';
+import { SignOutButton } from './sign-out-button';
 
 /*
  * The fixed sidebar every signed-in screen sits beside (SHL-1).
@@ -124,9 +125,9 @@ export function Sidebar() {
       </div>
 
       {/*
-        Profile footer. The sign-out control belongs here but ships in FIL-20, so
-        the identity block is a flexible column with room beside it rather than a
-        fixed two-item row.
+        Profile footer: the identity block with the sign-out control beside it
+        (FIL-20 · SHL). The name/email column flexes so the button sits flush
+        right without a fixed width.
       */}
       <div className="flex items-center gap-2.5 pt-4 pl-2">
         <span
@@ -143,6 +144,7 @@ export function Sidebar() {
             {profile.email}
           </span>
         </div>
+        <SignOutButton />
       </div>
     </aside>
   );

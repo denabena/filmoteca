@@ -6,10 +6,22 @@ import type { Profile } from '@/lib/current-user';
 import { Sidebar } from './sidebar';
 
 // usePathname needs an App Router context that jsdom has no way to provide, so
-// the hook itself is stubbed and each test sets the route it wants.
+// the hook itself is stubbed and each test sets the route it wants. useRouter is
+// stubbed too, because the footer's sign-out button reads it.
+const mockPush = jest.fn();
+const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
+  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
 }));
+
+// The sign-out button talks to the real Neon Auth client otherwise; stub it so
+// the sidebar renders without a live auth instance. A relative path is used
+// because next/jest resolves the `@/` alias for imports but not inside
+// jest.mock(); the mock still intercepts the button's `@/lib/auth/client`
+// import, since both resolve to the same file.
+const mockSignOut = jest.fn().mockResolvedValue(undefined);
+jest.mock('../../lib/auth/client', () => ({ authClient: { signOut: () => mockSignOut() } }));
 
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 
@@ -119,6 +131,14 @@ describe('Sidebar', () => {
     expect(screen.getByText('Ana S.')).toBeInTheDocument();
     expect(screen.getByText('AS')).toBeInTheDocument();
     expect(screen.queryByText('Mara K.')).not.toBeInTheDocument();
+  });
+
+  it('signs out from the footer control', async () => {
+    renderSidebar();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
   it('reaches every link by keyboard in visual order', async () => {
