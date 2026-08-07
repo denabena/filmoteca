@@ -1,11 +1,10 @@
 /**
- * The signed-in profile, and the only module that knows it is still mocked.
+ * The signed-in profile and the pure helpers the sidebar derives from it.
  *
- * FIL-27 (the sidebar) ships before FIL-11/FIL-12 add a User model and a sign in
- * endpoint, so `getCurrentUser` returns a fixed profile for now. When FIL-12
- * lands it replaces the body of that one function with a session read; the
- * provider, the sidebar and its tests are all written against `Profile` and do
- * not change.
+ * This module is client-safe on purpose: the sidebar is a Client Component and
+ * imports `shortName`/`avatarInitials` from here, so nothing in it may touch the
+ * session cookie or any server-only API. Reading the actual session lives in
+ * `current-user.server.ts`, which the shell layout (a Server Component) calls.
  */
 
 export interface Profile {
@@ -15,19 +14,29 @@ export interface Profile {
 }
 
 /**
- * Sample values from the Figma sidebar (04 · Dashboard), kept so the shell can
- * be reviewed against the design. These are a mock, not application defaults.
- *
- * TODO(FIL-12): read the signed-in user from the session instead.
+ * The signed-in user as Neon Auth reports it. `name` is a single field there,
+ * so it is split into first/last for the Profile the app renders.
  */
-const MOCKED_PROFILE: Profile = {
-  firstName: 'Mara',
-  lastName: 'Kovač',
-  email: 'mara@email.com',
-};
+export interface SessionUser {
+  name?: string | null;
+  email?: string | null;
+}
 
-export function getCurrentUser(): Profile {
-  return MOCKED_PROFILE;
+/**
+ * Maps a Neon Auth user onto the Profile the shell renders.
+ *
+ * `name` is split on the first space: everything before it is the first name,
+ * the rest is the last name. Missing pieces become empty strings, which the
+ * helpers below already tolerate, so the footer never renders "undefined".
+ */
+export function profileFromUser(user: SessionUser): Profile {
+  const trimmed = (user.name ?? '').trim();
+  const firstSpace = trimmed.indexOf(' ');
+
+  const firstName = firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace);
+  const lastName = firstSpace === -1 ? '' : trimmed.slice(firstSpace + 1).trim();
+
+  return { firstName, lastName, email: user.email ?? '' };
 }
 
 /** The sidebar footer form: "Mara K." (SHL-1). */

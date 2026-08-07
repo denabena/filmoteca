@@ -31,7 +31,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}>
+    // suppressHydrationWarning because Neon Auth's UI provider uses next-themes,
+    // which sets `style="color-scheme:…"` (and a theme class) on <html> from an
+    // inline script before React hydrates. That is an intended pre-hydration
+    // mutation, so the attribute diff on this one element is expected; the flag
+    // silences only that, not real mismatches elsewhere in the tree.
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
       </body>
