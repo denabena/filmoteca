@@ -16,11 +16,12 @@ const MIN_PASSWORD_LENGTH = 8;
  * The designed Create account screen (Figma frame 21 · REG-1, REG-2, REG-3,
  * REG-10, REG-11), replacing Neon Auth's generic view for /auth/sign-up.
  *
- * Wired to Neon Auth's email sign-up. The four designed error states (short
- * password, taken email, blank name, missing consent as distinct messages) are
- * FIL-18; this ships the happy path plus one plain message and the client-side
- * guards the form needs to be usable. On success it lands on the Dashboard;
- * routing into onboarding (A31) waits on the onboarding screens (FIL-21 onward).
+ * The four designed failure states (frames 22-25 · REG-5 to REG-8, FIL-18) reuse
+ * the field-error pattern from FIL-16: taken email, weak password (its message
+ * replaces the helper), unchecked consent, and blank name. Every failing field
+ * shows its own message; the weak-password error is validated client-side, the
+ * taken-email error comes back from Neon Auth. On success it lands on the
+ * Dashboard; onboarding routing (A31) waits on FIL-21+.
  */
 export default function SignUpPage() {
   const router = useRouter();
@@ -29,29 +30,48 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [consent, setConsent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setNameError(null);
+    setEmailError(null);
+    setPasswordError(null);
+    setConfirmError(null);
+    setConsentError(null);
+    setFormError(null);
 
-    if (!consent) {
-      setError('Please accept the Terms and Privacy Policy to continue.');
-      return;
+    // Validate every field first, so several bad fields each show their own
+    // message rather than one at a time (working decision on top of FIL-18).
+    let invalid = false;
+    if (!name.trim()) {
+      setNameError('Enter your name.');
+      invalid = true;
     }
-
+    if (!email.trim()) {
+      setEmailError('Enter your email.');
+      invalid = true;
+    }
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError('Password must be at least 8 characters.');
-      return;
+      setPasswordError('Password must be at least 8 characters.');
+      invalid = true;
+    } else if (password !== confirmPassword) {
+      // Confirm field is not in frame 21; added on request (see FIL-17 note).
+      setConfirmError('Passwords do not match.');
+      invalid = true;
     }
-
-    // Not in the Figma design (frame 21 has one password field); added on
-    // request. Raise with the designer before this ships (see note on FIL-17).
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
+    if (!consent) {
+      setConsentError('Please accept the Terms to continue.');
+      invalid = true;
     }
+    if (invalid) return;
 
     setSubmitting(true);
 
@@ -59,7 +79,13 @@ export default function SignUpPage() {
       const { error: signUpError } = await authClient.signUp.email({ name, email, password });
 
       if (signUpError) {
-        setError(authErrorMessage(signUpError, 'Could not create your account. Please try again.'));
+        if (signUpError.code === 'USER_ALREADY_EXISTS') {
+          setEmailError('This email is already registered. Sign in instead?');
+        } else {
+          setFormError(
+            authErrorMessage(signUpError, 'Could not create your account. Please try again.'),
+          );
+        }
         setSubmitting(false);
         return;
       }
@@ -68,20 +94,20 @@ export default function SignUpPage() {
       router.push('/');
       router.refresh();
     } catch {
-      setError('Something went wrong. Please try again.');
+      setFormError('Something went wrong. Please try again.');
       setSubmitting(false);
     }
   }
 
   async function handleGoogle() {
-    setError(null);
+    setFormError(null);
     const { error: socialError } = await authClient.signIn.social({
       provider: 'google',
       callbackURL: '/',
     });
 
     if (socialError) {
-      setError(authErrorMessage(socialError, 'Could not continue with Google.'));
+      setFormError(authErrorMessage(socialError, 'Could not continue with Google.'));
     }
   }
 
@@ -97,7 +123,11 @@ export default function SignUpPage() {
             autoComplete="name"
             placeholder="Alex Rivera"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            error={nameError ?? undefined}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (nameError) setNameError(null);
+            }}
             required
           />
           <AuthField
@@ -108,7 +138,11 @@ export default function SignUpPage() {
             autoComplete="email"
             placeholder="you@example.com"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            error={emailError ?? undefined}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              if (emailError) setEmailError(null);
+            }}
             required
           />
           <AuthField
@@ -119,9 +153,13 @@ export default function SignUpPage() {
             autoComplete="new-password"
             placeholder="••••••••"
             hint="At least 8 characters."
+            error={passwordError ?? undefined}
             minLength={MIN_PASSWORD_LENGTH}
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              if (passwordError) setPasswordError(null);
+            }}
             required
           />
           {/* Confirm field is not in frame 21; added on request (see FIL-17 note). */}
@@ -132,37 +170,60 @@ export default function SignUpPage() {
             name="confirmPassword"
             autoComplete="new-password"
             placeholder="••••••••"
+            error={confirmError ?? undefined}
             minLength={MIN_PASSWORD_LENGTH}
             value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
+            onChange={(event) => {
+              setConfirmPassword(event.target.value);
+              if (confirmError) setConfirmError(null);
+            }}
             required
           />
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <input
-            id="consent"
-            type="checkbox"
-            className="size-[18px] shrink-0 rounded accent-accent"
-            checked={consent}
-            onChange={(event) => setConsent(event.target.checked)}
-          />
-          <label htmlFor="consent" className="flex-1 text-[13px] leading-[1.5] text-text-secondary">
-            I agree to the{' '}
-            {/* No designed destination (A34); render as links that do not navigate. */}
-            <button type="button" className="font-medium text-accent">
-              Terms
-            </button>{' '}
-            and{' '}
-            <button type="button" className="font-medium text-accent">
-              Privacy Policy
-            </button>
-          </label>
+        <div className="flex flex-col gap-[7px]">
+          <div className="flex items-center gap-2.5">
+            <input
+              id="consent"
+              type="checkbox"
+              aria-invalid={consentError ? true : undefined}
+              aria-describedby={consentError ? 'consent-error' : undefined}
+              className="size-[18px] shrink-0 rounded accent-accent"
+              checked={consent}
+              onChange={(event) => {
+                setConsent(event.target.checked);
+                if (consentError) setConsentError(null);
+              }}
+            />
+            <label
+              htmlFor="consent"
+              className="flex-1 text-[13px] leading-[1.5] text-text-secondary"
+            >
+              I agree to the{' '}
+              {/* No designed destination (A34); render as links that do not navigate. */}
+              <button type="button" className="font-medium text-accent">
+                Terms
+              </button>{' '}
+              and{' '}
+              <button type="button" className="font-medium text-accent">
+                Privacy Policy
+              </button>
+            </label>
+          </div>
+          {consentError && (
+            <p
+              id="consent-error"
+              role="alert"
+              className="text-[13px] leading-[1.5] text-danger-text"
+            >
+              {consentError}
+            </p>
+          )}
         </div>
 
-        {error && (
-          <p role="alert" className="text-[13px] leading-[1.5] text-accent">
-            {error}
+        {formError && (
+          <p role="alert" className="text-[13px] leading-[1.5] text-danger-text">
+            {formError}
           </p>
         )}
 
