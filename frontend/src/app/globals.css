@@ -42,6 +42,10 @@
 
   --color-accent: #f0455f;
 
+  /* Status/Danger: field-error border and message text (first used on FIL-16). */
+  --color-danger: #e5544b;
+  --color-danger-text: #f08a83;
+
   /* Loaded by next/font in src/app/layout.tsx. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
