@@ -189,6 +189,13 @@ owner; reverse the spread and one test fails, which is the point of that test. A
 owned by someone else is reported as **404, not 403**, because a 403 confirms the row exists
 and so leaks another account's data by omission.
 
+**The dashboard is one route, not one per section.** `GET /api/dashboard` returns a
+`DashboardSummary`, following the tech spec's single `getDashboardSummary` operation. Frame
+04 renders every section at once, so splitting it would buy the frontend four round trips it
+has no use for. FIL-33 filled in `continueWatching` and `upNext`; the monthly stats
+(FIL-30, FIL-31), weekly activity (FIL-32) and Picker teaser **add keys to that response
+rather than routes beside it**.
+
 **The catalogue is not the watchlist.** `Title` rows are per-user watchlist entries. The
 TMDB catalogue is a global candidate pool for the Picker, and TMDB's terms cap caching at
 six months, so it gets re-imported. That is why `year`, `runtime`, `director` and
