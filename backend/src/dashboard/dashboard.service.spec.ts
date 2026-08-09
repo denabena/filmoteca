@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Title } from '@prisma/client';
+import { PickerGateService } from '../picker/picker-gate.service';
 import { TitlesRepository } from '../titles/titles.repository';
 import { DashboardService, UP_NEXT_DEFAULT_LIMIT } from './dashboard.service';
 import { parseMonth } from './month';
@@ -52,6 +53,7 @@ describe('DashboardService', () => {
   const findMany = jest.fn();
   const findFirst = jest.fn();
   const count = jest.fn();
+  const getGateState = jest.fn();
 
   let dashboard: DashboardService;
 
@@ -59,11 +61,15 @@ describe('DashboardService', () => {
     findMany.mockReset().mockResolvedValue([]);
     findFirst.mockReset().mockResolvedValue(null);
     count.mockReset().mockResolvedValue(0);
+    getGateState
+      .mockReset()
+      .mockResolvedValue({ unlocked: false, ratedCount: 0, threshold: 3 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DashboardService,
         { provide: TitlesRepository, useValue: { findMany, findFirst, count } },
+        { provide: PickerGateService, useValue: { getState: getGateState } },
       ],
     }).compile();
 
@@ -378,6 +384,26 @@ describe('DashboardService', () => {
       expect(summary.stats.topGenre).toEqual({ name: 'Drama', count: 1 });
     });
 
+    // FIL-67's acceptance criterion: the teaser and the Picker page must read the
+    // same value from the same source, so the summary delegates rather than
+    // recomputing.
+    it('takes the picker gate from the same service the Picker page reads', async () => {
+      getGateState.mockResolvedValue({
+        unlocked: true,
+        ratedCount: 5,
+        threshold: 3,
+      });
+
+      const summary = await dashboard.getSummary(USER, OCTOBER);
+
+      expect(getGateState).toHaveBeenCalledWith(USER);
+      expect(summary.picker).toEqual({
+        unlocked: true,
+        ratedCount: 5,
+        threshold: 3,
+      });
+    });
+
     it('reads as a fully empty dashboard for a brand new account', async () => {
       const summary = await dashboard.getSummary(USER, OCTOBER);
 
@@ -389,6 +415,11 @@ describe('DashboardService', () => {
         averageRating: null,
         topGenre: null,
         activity: { buckets: [0, 0, 0, 0], total: 0, currentBucket: null },
+      });
+      expect(summary.picker).toEqual({
+        unlocked: false,
+        ratedCount: 0,
+        threshold: 3,
       });
     });
   });

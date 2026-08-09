@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { PickerModule } from '../picker/picker.module';
 import { TitlesModule } from '../titles/titles.module';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
@@ -10,7 +11,7 @@ import { DashboardService } from './dashboard.service';
  * repository's own doc comment for why that is a rule.
  */
 @Module({
-  imports: [AuthModule, TitlesModule],
+  imports: [AuthModule, TitlesModule, PickerModule],
   controllers: [DashboardController],
   providers: [DashboardService],
   exports: [DashboardService],

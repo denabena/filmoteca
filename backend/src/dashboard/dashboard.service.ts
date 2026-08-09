@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Title, TitleType } from '@prisma/client';
+import {
+  PickerGateService,
+  type PickerGateState,
+} from '../picker/picker-gate.service';
 import { TitlesRepository } from '../titles/titles.repository';
 import {
   ACTIVITY_BUCKET_COUNT,
@@ -110,14 +114,15 @@ export interface MonthlyStats {
  * What the dashboard needs in one read.
  *
  * The tech spec models this as a single `getDashboardSummary(month)` operation
- * feeding the hero, stats, queue, activity and teaser. The Picker teaser is the
- * only part still missing; it adds a key here rather than a route beside it, so
- * the dashboard stays one request.
+ * feeding the hero, stats, queue, activity and teaser. Every part of that is here
+ * now; `picker` is the teaser's locked/unlocked state, read from the same service
+ * the Picker page itself reads, so the two screens cannot disagree.
  */
 export interface DashboardSummary {
   continueWatching: ContinueWatchingTitle | null;
   upNext: UpNextTitle[];
   stats: MonthlyStats;
+  picker: PickerGateState;
 }
 
 /**
@@ -133,7 +138,10 @@ export const UP_NEXT_DEFAULT_LIMIT = 7;
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly titles: TitlesRepository) {}
+  constructor(
+    private readonly titles: TitlesRepository,
+    private readonly pickerGate: PickerGateService,
+  ) {}
 
   /**
    * The up-next queue: want-to-watch titles, newest first (A11).
@@ -263,13 +271,14 @@ export class DashboardService {
     userId: string,
     range: MonthRange,
   ): Promise<DashboardSummary> {
-    const [continueWatching, upNext, stats] = await Promise.all([
+    const [continueWatching, upNext, stats, picker] = await Promise.all([
       this.getContinueWatching(userId),
       this.getUpNext(userId),
       this.getMonthlyStats(userId, range),
+      this.pickerGate.getState(userId),
     ]);
 
-    return { continueWatching, upNext, stats };
+    return { continueWatching, upNext, stats, picker };
   }
 }
 
