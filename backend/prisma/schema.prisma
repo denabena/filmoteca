@@ -104,6 +104,7 @@ model Genre {
 
   titles     Title[]
   candidates CatalogueTitle[]
+  picks      Pick[]
 
   @@map("genres")
 }
@@ -241,7 +242,80 @@ model CatalogueTitle {
   /// candidate pool that exists to be queried by genre, so a film that is both
   /// Action and Sci-Fi should be findable under either. It becomes single-genre at
   /// the moment PIC-7 copies it into someone's watchlist.
+  picks Pick[]
+
   @@unique([type, tmdbId, genreId])
   @@index([genreId, type])
   @@map("catalogue_titles")
+}
+
+/// Where a suggestion stands, from the tech spec's Pick entity.
+enum PickState {
+  suggested
+  added
+  dismissed
+}
+
+/// One suggestion made to one user (FIL-65, FIL-66).
+///
+/// Per-user, unlike CatalogueTitle: the same candidate is suggestable to
+/// everybody, but a suggestion belongs to whoever it was made to.
+///
+/// The card fields are **copied from the candidate**, not joined, for the same
+/// reason `Title` copies them: TMDB's terms cap caching at six months, so
+/// catalogue rows get re-imported, and a suggestion already shown to someone must
+/// not change underneath them.
+model Pick {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id")
+
+  /// Which generation produced this. The three picks of one run share a batch, so
+  /// "the current picks" is a query rather than a deletion: regenerating adds a
+  /// batch instead of destroying the old one, which is what keeps a failed
+  /// generation from emptying the dashboard teaser.
+  batchId String @map("batch_id") @db.Uuid
+
+  /// 0, 1, 2 within the batch. Rank 0 is the top pick, which is the one the
+  /// dashboard teaser reads.
+  rank Int @db.SmallInt
+
+  /// Kept so a dismissal can exclude this candidate from every future run. The
+  /// relation is Restrict: a candidate that somebody has been shown must not
+  /// vanish from under their pick.
+  catalogueTitleId String         @map("catalogue_title_id") @db.Uuid
+  catalogueTitle   CatalogueTitle @relation(fields: [catalogueTitleId], references: [id], onDelete: Restrict)
+
+  name    String
+  year    Int?
+  type    TitleType
+  runtime Int?
+
+  genreId String @map("genre_id") @db.Uuid
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Restrict)
+
+  posterPath String? @map("poster_path")
+
+  /// "96% match" on the pick card. See PickScorer for how it is computed; the
+  /// design does not say, and the number invites the question.
+  matchPercent Int @map("match_percent")
+
+  /// The reason line. Required to reference something real about this user's
+  /// library, which is why it is stored rather than recomputed: the sentence has
+  /// to stay true to the moment it was written.
+  reason String
+
+  /// The mood chips selected for this run, empty when none were.
+  moods String[]
+
+  state PickState @default(suggested)
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  /// A candidate is offered to a user at most once, which is what makes a
+  /// dismissal permanent without a second table.
+  @@unique([userId, catalogueTitleId])
+  @@index([userId, batchId])
+  @@index([userId, state])
+  @@map("picks")
 }

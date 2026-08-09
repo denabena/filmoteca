@@ -222,6 +222,21 @@ stricter reading wins and merely adding titles never unlocks anything. It is der
 read rather than stored, so deleting or un-rating a title re-locks without an invalidation
 hook on any mutation path.
 
+**Dismissing a pick excludes the TMDB title, not the catalogue row.** These two facts fight
+each other and the collision is easy to reintroduce: `catalogue_titles` holds one row per
+title per genre, so excluding the single row a user dismissed left the same film eligible
+under its other genres. Dismissing a film as Drama and being offered it again as Sci-Fi is
+exactly what "Not for me" exists to prevent. `CandidatesRepository` therefore excludes on
+`(type, tmdbId)`, and `PicksService` de-duplicates the pool on the same pair so one batch
+never shows the same film twice. There is a test for each.
+
+Two more Picker decisions that are working assumptions, both flagged in code for the
+designer: **dismissal is permanent** (the design never says whether "Not for me" means "not
+tonight" or "never", and those are different products), and the **match percentage** is
+0.45 genre affinity + 0.30 mood fit + 0.25 TMDB acclaim, scaled into 60-99. Nothing designs
+that number, and "96% match" invites the question. Genre affinity is read from **rated
+titles**, not from `Profile.favoriteGenres`, which is FIL-23 and does not exist yet.
+
 **The catalogue is not the watchlist.** `Title` rows are per-user watchlist entries. The
 TMDB catalogue is a global candidate pool for the Picker, and TMDB's terms cap caching at
 six months, so it gets re-imported. That is why `year`, `runtime`, `director` and
