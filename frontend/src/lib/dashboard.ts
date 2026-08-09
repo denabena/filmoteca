@@ -116,3 +116,35 @@ export function previousMonthKey(month: string): string {
 
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
+
+/** One card on the Picker page (PIC-6). Mirrors `PickCard` in the backend. */
+export interface PickCard {
+  id: string;
+  name: string;
+  year: number | null;
+  type: TitleType;
+  genre: string;
+  runtime: number | null;
+  posterPath: string | null;
+  matchPercent: number;
+  reason: string;
+  state: 'suggested' | 'added' | 'dismissed';
+}
+
+/**
+ * The six mood chips (PIC-3), with the labels the design uses.
+ *
+ * The values are the slugs the backend validates against and rejects on
+ * mismatch, so this list and `MOODS` in `backend/src/picker/moods.ts` must agree.
+ * Another instance of the hand-mirrored contract wart.
+ */
+export const MOOD_OPTIONS = [
+  { value: 'something-light', label: 'Something light' },
+  { value: 'mind-bender', label: 'Mind-bender' },
+  { value: 'edge-of-seat', label: 'Edge of seat' },
+  { value: 'feel-good', label: 'Feel-good' },
+  { value: 'short-and-sweet', label: 'Short & sweet' },
+  { value: 'critically-loved', label: 'Critically loved' },
+] as const;
+
+export type Mood = (typeof MOOD_OPTIONS)[number]['value'];

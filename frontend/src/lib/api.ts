@@ -18,7 +18,10 @@ import { getAuth } from '@/lib/auth/server';
  * Vercel's service binding, so it differs per deployment and must never be baked
  * into client code.
  */
-export async function apiFetch<T>(path: string): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init: { method?: 'GET' | 'POST'; body?: unknown } = {},
+): Promise<T> {
   const auth = getAuth();
   const session = await auth.getSession();
 
@@ -32,7 +35,12 @@ export async function apiFetch<T>(path: string): Promise<T> {
   const token = await auth.token();
 
   const response = await fetch(`${process.env.BACKEND_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token?.data?.token}` },
+    method: init.method ?? 'GET',
+    headers: {
+      Authorization: `Bearer ${token?.data?.token}`,
+      ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
     // Every one of these reads per-user data that a mutation elsewhere can
     // change, so a cached response would show a stale dashboard after adding a
     // title. There is nothing here worth caching.
@@ -44,6 +52,12 @@ export async function apiFetch<T>(path: string): Promise<T> {
     // debug from when this fails in a deployed preview.
     const detail = await response.text().catch(() => '');
     throw new Error(`${path} failed: HTTP ${response.status} ${detail}`.trim());
+  }
+
+  // 204 on dismiss, and `.json()` on an empty body throws rather than returning
+  // null, so the no-content case has to be handled before parsing.
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;
