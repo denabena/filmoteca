@@ -42,6 +42,8 @@
   --color-border-strong: #353d48;
 
   --color-accent: #f0455f;
+  /* Selected mood chip and match badge backgrounds. */
+  --color-accent-soft: #33212a;
 
   /*
    * Status tones. Each has a solid, a text and a soft (background) variant, and
