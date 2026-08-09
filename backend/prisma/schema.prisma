@@ -29,12 +29,20 @@ enum TitleType {
   series
 }
 
+/// The STATUS chips in the library table (06) and the Status select on the Add
+/// title form (08). Lowercase to match TitleType and the tech spec's
+/// `enum: watched, watching, want to watch`.
+enum TitleStatus {
+  watched
+  watching
+  want_to_watch
+}
+
 /// Per-user settings and identity, from the tech spec's Profile entity.
 ///
-/// Deliberately the only model here. FIL-10 is the persistence foundation and
-/// nothing more, so Title, Genre and Pick belong to their own feature tickets.
-/// This one exists because every view needs a profile and because it establishes
-/// the ownership pattern FIL-14 enforces.
+/// `favoriteGenres` from the tech spec is deliberately absent: it is FIL-23's to
+/// add, and that ticket is in progress elsewhere. Pick is likewise still to come,
+/// with FIL-65 and FIL-66.
 model Profile {
   id String @id @default(uuid()) @db.Uuid
 
@@ -59,4 +67,109 @@ model Profile {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("profiles")
+}
+
+/// The twelve genres onboarding offers (GNR-2).
+///
+/// Reference data, not user data, so no owner column: A24 retires createGenre and
+/// editGenre, which fixes the set at twelve. The rows are seeded by the migration
+/// that creates this table rather than by a seed script, so any environment that
+/// has migrated has them, with no second manual step to forget on deploy.
+///
+/// A table rather than a Postgres enum for three reasons: listGenresWithCounts
+/// (FIL-43) has to return all twelve including the zeros, `colorSlot` and
+/// `descriptor` are per-genre data that would otherwise be stranded in code, and
+/// the TMDB mapping below has to be changeable without a schema migration.
+model Genre {
+  id   String @id @default(uuid()) @db.Uuid
+  slug String @unique
+  name String
+
+  /// One of the eight Foundations genre palette slots. Twelve genres over eight
+  /// slots, so slots repeat by design.
+  colorSlot Int @map("color_slot") @db.SmallInt
+
+  /// The card tagline on frame 12. Null until that copy is read out of the
+  /// design; nothing renders it yet, and inventing it here would look settled.
+  descriptor String?
+
+  /// TMDB's two genre vocabularies, held as data so re-mapping is an UPDATE
+  /// rather than a re-import of the whole catalogue. Movies cover all twelve. TV
+  /// has no Thriller, Romance, Horror or Fantasy at all, so those four carry a
+  /// null `tmdbTvId` and the Picker serves films for them. Sci-Fi's TV id is the
+  /// fused "Sci-Fi & Fantasy", which is why fantasy series land under Sci-Fi.
+  /// The full reasoning is in the `tmdb-catalogue` skill.
+  tmdbMovieId Int? @map("tmdb_movie_id")
+  tmdbTvId    Int? @map("tmdb_tv_id")
+
+  titles Title[]
+
+  @@map("genres")
+}
+
+/// One entry in a user's watchlist, from the tech spec's Title entity.
+///
+/// `progress` and `listChips` from that table are deliberately not columns. A9
+/// and A17 make both display-only with no form anywhere that can write them, and
+/// a column nothing can populate is worse than an absent one: it reads as
+/// supported.
+model Title {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The owner, taken from the verified JWT `sub`. Non-nullable, so a title
+  /// cannot exist unowned. A plain string rather than a foreign key for the same
+  /// reason as `Profile.userId`: `neon_auth."user"` lives in a schema Prisma does
+  /// not manage. Nothing outside TitlesRepository may query this table without
+  /// it.
+  userId String @map("user_id")
+
+  name    String
+  type    TitleType
+  status  TitleStatus
+  genreId String      @map("genre_id") @db.Uuid
+
+  /// Restrict, not Cascade: the twelve genres are fixed reference data, so a
+  /// delete that would orphan titles is a bug to surface, not to propagate.
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Restrict)
+
+  /// A20 ties neither watch date nor rating to status, so a want-to-watch title
+  /// may carry both and a watched title neither. Date rather than timestamp
+  /// because FIL-30 and FIL-32 bucket these by month and by week, and a
+  /// timezone-bearing value makes "watched in July" ambiguous.
+  watchDate DateTime? @map("watch_date") @db.Date
+
+  /// Half-star units, 0 to 10, so "4.5 / 5" stores as 9. A21 allows half stars
+  /// because that string appears on frames 06, 07 and 08. An integer rather than
+  /// a decimal keeps FIL-31's average exact and avoids Prisma's Decimal wrapper
+  /// leaking into JSON responses. Callers convert at the edge, not in the store.
+  rating Int? @db.SmallInt
+
+  note     String?
+  favorite Boolean @default(false)
+
+  /// Display-only, per A17 and DET-6: the title detail screen shows these but no
+  /// form anywhere captures them. They are copied from the Picker catalogue when
+  /// a suggestion is added to the watchlist, and stay null for a hand-typed
+  /// title. Copied rather than joined on purpose: the TMDB licence caps caching
+  /// at six months, so catalogue rows get re-imported, and a user's own row must
+  /// not change or break underneath them when that happens.
+  year       Int?
+  runtime    Int?
+  director   String?
+  posterPath String? @map("poster_path")
+
+  /// `createdAt` is the tech spec's `addedAt` ("Added Sep 28, 2024" on 07).
+  /// Server-set and never accepted from a caller, per FIL-54.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Every index leads with `user_id`, because every query against this table is
+  /// scoped to one owner. The three trailing columns are the orderings the
+  /// dashboard needs: status for the up-next rail, updatedAt for the
+  /// continue-watching hero, watchDate for the monthly and weekly aggregates.
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([userId, updatedAt])
+  @@index([userId, watchDate])
+  @@map("titles")
 }
