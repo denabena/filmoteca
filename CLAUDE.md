@@ -229,6 +229,21 @@ six months, so it gets re-imported. That is why `year`, `runtime`, `director` an
 own entry must not change or break when the catalogue refreshes. Those four are null for a
 hand-typed title, because per A17 no form anywhere captures them.
 
+**The catalogue holds one row per title per genre, and that is not an accident.** Keying
+`catalogue_titles` on `(type, tmdbId)` alone looks obviously right and is wrong: the import
+runs one `/discover` query per genre, so the last genre queried overwrote every earlier one,
+and since genres are iterated alphabetically that starved the early ones. A real 724-row run
+left **Action holding a single movie**. The key is `(type, tmdbId, genreId)`, so each genre
+query keeps what it found. A19 constrains the *user's* `Title` to one genre; it says nothing
+about a candidate pool whose entire purpose is being queried by genre.
+
+Two more things about that table: it has **no owner column** and must never get one, because
+the same candidate has to be suggestable to everybody; and it is **read-only from the app**,
+because PIC-7 *copies* a candidate into someone's `titles` rather than moving it.
+
+Run it with `npm run catalogue:import` from `backend/`, optionally with a page count
+(`-- 10`). Re-running is safe and required: TMDB caps caching at six months.
+
 **The twelve genres are seeded by the migration, not a seed script.** A24 retires
 createGenre and editGenre, so the set is fixed reference data. Putting the rows in
 `20260809175645_add_title_genre_and_ownership/migration.sql` means any environment that has

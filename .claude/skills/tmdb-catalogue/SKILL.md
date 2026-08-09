@@ -166,8 +166,15 @@ Two rules that follow:
   re-runs avoid duplicates, which `DO NOTHING` satisfies while silently keeping stale genres
   forever.
 
-A title appearing in two genre queries arrives twice, so **query order decides its genre**.
-That ordering is a real decision and is still open.
+A title appearing in two genre queries arrives twice. **Resolved in FIL-81: it is stored
+twice**, once per genre, because `catalogue_titles` is keyed on `(type, tmdb_id, genre_id)`.
+
+Query order deciding a single genre was tried first and is actively harmful. Genres are
+iterated alphabetically, so last-write-wins starved the early ones: a real 724-row import
+left Action with **one** movie, because almost every action film was later re-claimed by
+Crime, Drama, Sci-Fi or Thriller. With the wider key every genre holds a full pool. A19
+constrains the user's own `Title` to one genre and says nothing about a pool that exists to
+be queried by genre; a candidate becomes single-genre when PIC-7 copies it into a watchlist.
 
 ## Mood chips map onto `/discover` almost entirely
 
@@ -222,7 +229,6 @@ at TMDB's ~40 requests/second ceiling. Storage is trivial.
 
 | Question                                                                                     | Blocks  |
 | -------------------------------------------------------------------------------------------- | ------- |
-| Query order across the twelve genres, which decides a multi-genre title's single genre       | FIL-81  |
 | Mind-bender keyword list, roughly ten TMDB keyword ids                                       | FIL-65  |
 | TMDB attribution in the UI                                                                   | licence |
 | Whether series runtime means per-episode or total on DET-4                                   | FIL-81  |
