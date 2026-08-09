@@ -189,12 +189,28 @@ owner; reverse the spread and one test fails, which is the point of that test. A
 owned by someone else is reported as **404, not 403**, because a 403 confirms the row exists
 and so leaks another account's data by omission.
 
-**The dashboard is one route, not one per section.** `GET /api/dashboard` returns a
-`DashboardSummary`, following the tech spec's single `getDashboardSummary` operation. Frame
-04 renders every section at once, so splitting it would buy the frontend four round trips it
-has no use for. FIL-33 filled in `continueWatching` and `upNext`; the monthly stats
-(FIL-30, FIL-31), weekly activity (FIL-32) and Picker teaser **add keys to that response
-rather than routes beside it**.
+**The dashboard is one route, not one per section.** `GET /api/dashboard?month=YYYY-MM`
+returns a `DashboardSummary`, following the tech spec's single `getDashboardSummary`
+operation. Frame 04 renders every section at once, so splitting it would buy the frontend
+four round trips it has no use for. The Picker teaser is the last piece missing and **adds a
+key to that response rather than a route beside it**.
+
+`month` is optional and defaults to the current month. It scopes the **stats only**: per A11
+and A9 the up-next rail and the continue-watching hero are not month-scoped.
+
+**A title's month is its `watchDate`, so a watched title with no date counts nowhere.** That
+is deliberate and is FIL-30's acceptance criterion. Three more rules in
+`backend/src/dashboard/` that are decisions rather than readings of the design, each flagged
+for the designer: the activity chart always draws four bars, so a month is cut as days 1-7,
+8-14, 15-21 and **22 to the end**, which makes the last bar one to three days longer; a tie
+for top genre breaks alphabetically; and `averageRating` is `null` rather than `0` when
+nothing is rated, because the card's empty state is "- / 5" and has to stay distinguishable
+from a real average of zero.
+
+Note that `stats.activity.total` and `stats.watched.count` are derived from the same row set
+and are therefore always equal. A29 records that the mock contradicts itself here, showing 14
+on the badge and 12 on the card for the same month; computing both from one query is what
+stops that being reproduced.
 
 **The catalogue is not the watchlist.** `Title` rows are per-user watchlist entries. The
 TMDB catalogue is a global candidate pool for the Picker, and TMDB's terms cap caching at
