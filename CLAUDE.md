@@ -192,8 +192,8 @@ and so leaks another account's data by omission.
 **The dashboard is one route, not one per section.** `GET /api/dashboard?month=YYYY-MM`
 returns a `DashboardSummary`, following the tech spec's single `getDashboardSummary`
 operation. Frame 04 renders every section at once, so splitting it would buy the frontend
-four round trips it has no use for. The Picker teaser is the last piece missing and **adds a
-key to that response rather than a route beside it**.
+four round trips it has no use for. Every section of the spec's operation is present now:
+`continueWatching`, `upNext`, `stats` and `picker`.
 
 `month` is optional and defaults to the current month. It scopes the **stats only**: per A11
 and A9 the up-next rail and the continue-watching hero are not month-scoped.
@@ -211,6 +211,16 @@ Note that `stats.activity.total` and `stats.watched.count` are derived from the 
 and are therefore always equal. A29 records that the mock contradicts itself here, showing 14
 on the badge and 12 on the card for the same month; computing both from one query is what
 stops that being reproduced.
+
+**The Picker unlock rule lives in exactly one service.** `PickerGateService` decides it, the
+Picker page reads it at `GET /api/picker/gate`, and the dashboard embeds the same value under
+`picker`. Two routes, one source, which is what stops the teaser and the Picker page showing a
+user a locked card on one screen and an unlocked one on the other. The rule is **three rated
+titles**, and both halves of that are decisions: A27 leaves the number undecided, and the two
+copy strings disagree (frame 16 says "titles", frame 05 says "added and rated"), so the
+stricter reading wins and merely adding titles never unlocks anything. It is derived on every
+read rather than stored, so deleting or un-rating a title re-locks without an invalidation
+hook on any mutation path.
 
 **The catalogue is not the watchlist.** `Title` rows are per-user watchlist entries. The
 TMDB catalogue is a global candidate pool for the Picker, and TMDB's terms cap caching at
