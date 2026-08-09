@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { GenresModule } from './genres/genres.module';
 import { PickerModule } from './picker/picker.module';
 import { ProfileModule } from './profile/profile.module';
 import { TitlesModule } from './titles/titles.module';
@@ -21,6 +22,7 @@ import { TitlesModule } from './titles/titles.module';
     TitlesModule,
     DashboardModule,
     PickerModule,
+    GenresModule,
   ],
   controllers: [AppController],
   providers: [AppService],

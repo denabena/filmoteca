@@ -4,6 +4,7 @@ import {
   PickerGateService,
   type PickerGateState,
 } from '../picker/picker-gate.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { TitlesRepository } from '../titles/titles.repository';
 import {
   ACTIVITY_BUCKET_COUNT,
@@ -22,7 +23,7 @@ import {
  * cheaper trade; this alias is so it reads as a deliberate narrowing rather than
  * an `any` in disguise.
  */
-type TitleWithGenre = Title & { genre: { name: string } };
+type TitleWithGenre = Title & { genre: { name: string; colorSlot: number } };
 
 /**
  * A card in the "Up next in your watchlist" rail (DSH-6).
@@ -71,10 +72,17 @@ export interface WatchedStat {
   trend: number | null;
 }
 
-/** The "TOP GENRE" card (DSH-5): the month's most-watched genre and its count. */
+/**
+ * The "TOP GENRE" card (DSH-5): the month's most-watched genre and its count.
+ *
+ * `colorSlot` indexes the eight-slot Foundations genre palette. It travels with
+ * the name because FIL-36 requires one colour per genre used everywhere, and the
+ * frontend cannot derive it: the mapping lives on the `genres` row.
+ */
 export interface TopGenreStat {
   name: string;
   count: number;
+  colorSlot: number;
 }
 
 /**
@@ -118,11 +126,39 @@ export interface MonthlyStats {
  * now; `picker` is the teaser's locked/unlocked state, read from the same service
  * the Picker page itself reads, so the two screens cannot disagree.
  */
+/**
+ * The current top pick, for the dashboard teaser (DSH-8).
+ *
+ * Rank 0 of the newest batch, which is the same card the Picker page shows first.
+ * `reason` is the full sentence; shortening it is the frontend's job, since how
+ * much fits is a layout question.
+ */
+export interface TopPick {
+  id: string;
+  name: string;
+  year: number | null;
+  type: TitleType;
+  genre: string;
+  posterPath: string | null;
+  reason: string;
+}
+
 export interface DashboardSummary {
   continueWatching: ContinueWatchingTitle | null;
   upNext: UpNextTitle[];
   stats: MonthlyStats;
   picker: PickerGateState;
+  /** Null when the Picker is locked or nothing has been generated yet. */
+  topPick: TopPick | null;
+  /**
+   * Months the dropdown may offer: every month the user has watched something in,
+   * newest first, always including the current month.
+   *
+   * FIL-40 asks for "any earlier month that has data", which the frontend cannot
+   * know without asking. Deriving it here keeps the dropdown honest instead of
+   * offering twelve months of guaranteed-empty cards.
+   */
+  availableMonths: string[];
 }
 
 /**
@@ -141,6 +177,7 @@ export class DashboardService {
   constructor(
     private readonly titles: TitlesRepository,
     private readonly pickerGate: PickerGateService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -257,7 +294,7 @@ export class DashboardService {
         trend: watched.length === 0 ? null : watched.length - previousCount,
       },
       averageRating: meanRating(watched.map((row) => row.rating)),
-      topGenre: topGenre(watched.map((row) => row.genre.name)),
+      topGenre: topGenre(watched.map((row) => row.genre)),
       activity: activity(
         watched.map((row) => row.watchDate),
         range,
@@ -266,19 +303,81 @@ export class DashboardService {
     };
   }
 
+  /**
+   * Months the user has watched something in, newest first.
+   *
+   * The current month is always included even when empty, because the dashboard
+   * opens on it and a dropdown that cannot select the month you are looking at is
+   * broken. Everything else is real data, so the list never offers a month whose
+   * cards are guaranteed blank (FIL-40).
+   */
+  async getAvailableMonths(
+    userId: string,
+    now: Date = new Date(),
+  ): Promise<string[]> {
+    const dated = await this.titles.findMany(userId, {
+      where: { status: 'watched', watchDate: { not: null } },
+      orderBy: [{ watchDate: 'desc' }],
+    });
+
+    const current = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const months = new Set<string>([current]);
+
+    for (const title of dated) {
+      if (!title.watchDate) continue;
+      const date = title.watchDate;
+      months.add(
+        `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
+      );
+    }
+
+    return [...months].sort().reverse();
+  }
+
+  /** The current top pick for the teaser: rank 0 of the newest batch (DSH-8). */
+  async getTopPick(userId: string): Promise<TopPick | null> {
+    const latest = await this.prisma.pick.findFirst({
+      where: { userId, state: { not: 'dismissed' } },
+      orderBy: [{ generatedAt: 'desc' }, { rank: 'asc' }],
+      include: { genre: true },
+    });
+
+    if (!latest) return null;
+
+    return {
+      id: latest.id,
+      name: latest.name,
+      year: latest.year,
+      type: latest.type,
+      genre: latest.genre.name,
+      posterPath: latest.posterPath,
+      reason: latest.reason,
+    };
+  }
+
   /** The whole dashboard in one read, which is what frame 04 actually renders. */
   async getSummary(
     userId: string,
     range: MonthRange,
   ): Promise<DashboardSummary> {
-    const [continueWatching, upNext, stats, picker] = await Promise.all([
-      this.getContinueWatching(userId),
-      this.getUpNext(userId),
-      this.getMonthlyStats(userId, range),
-      this.pickerGate.getState(userId),
-    ]);
+    const [continueWatching, upNext, stats, picker, topPick, availableMonths] =
+      await Promise.all([
+        this.getContinueWatching(userId),
+        this.getUpNext(userId),
+        this.getMonthlyStats(userId, range),
+        this.pickerGate.getState(userId),
+        this.getTopPick(userId),
+        this.getAvailableMonths(userId),
+      ]);
 
-    return { continueWatching, upNext, stats, picker };
+    return {
+      continueWatching,
+      upNext,
+      stats,
+      picker,
+      topPick,
+      availableMonths,
+    };
   }
 }
 
@@ -317,19 +416,25 @@ function meanRating(ratings: (number | null)[]): number | null {
  * is arbitrary but stable and explainable. **Raise it with the designer**, who may
  * prefer the most recently watched of the tied genres.
  */
-function topGenre(names: string[]): TopGenreStat | null {
-  if (names.length === 0) {
+function topGenre(
+  genres: { name: string; colorSlot: number }[],
+): TopGenreStat | null {
+  if (genres.length === 0) {
     return null;
   }
 
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { count: number; colorSlot: number }>();
 
-  for (const name of names) {
-    counts.set(name, (counts.get(name) ?? 0) + 1);
+  for (const genre of genres) {
+    const seen = counts.get(genre.name);
+    counts.set(genre.name, {
+      count: (seen?.count ?? 0) + 1,
+      colorSlot: genre.colorSlot,
+    });
   }
 
   return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
+    .map(([name, { count, colorSlot }]) => ({ name, count, colorSlot }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0];
 }
 

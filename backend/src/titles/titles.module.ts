@@ -1,18 +1,21 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { TitlesController } from './titles.controller';
 import { TitlesRepository } from './titles.repository';
 
 /**
  * Owns access to the `titles` table.
  *
- * No controller: FIL-14 has no screen of its own, it exists because accounts
- * force ownership into the data layer. The endpoints that use this arrive with
- * their own tickets (FIL-41, 42, 54 to 57 for CRUD; FIL-30 to 33 for the
- * dashboard), and each of those imports this module rather than reaching for
- * PrismaService directly.
+ * Carries the read and create endpoints (FIL-42, FIL-54). The rest of the CRUD
+ * (list, update, delete) arrives with FIL-41, 55, 56 and 57. Everything routes
+ * through TitlesRepository rather than PrismaService, so ownership is enforced
+ * once.
  *
  * PrismaService comes from the global PrismaModule, so nothing is imported here.
  */
 @Module({
+  imports: [AuthModule],
+  controllers: [TitlesController],
   providers: [TitlesRepository],
   exports: [TitlesRepository],
 })

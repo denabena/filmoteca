@@ -208,7 +208,15 @@ four round trips it has no use for. Every section of the spec's operation is pre
 `continueWatching`, `upNext`, `stats` and `picker`.
 
 `month` is optional and defaults to the current month. It scopes the **stats only**: per A11
-and A9 the up-next rail and the continue-watching hero are not month-scoped.
+and A9 the up-next rail and the continue-watching hero are not month-scoped. The response also
+carries `availableMonths` (months the user actually watched something in, plus the current
+one) and `topPick` (rank 0 of the newest batch, the same card the Picker page lists first).
+
+**The dashboard's month lives in client state, not the URL, and that is deliberate.** FIL-40
+requires a reload to reset to the current month, which `?month=` cannot do: a URL survives a
+refresh by definition. `DashboardView` owns the selection and refetches through a Server
+Action. The cost is a view that is not shareable and a back button that does not step through
+months. Reversing it is one line if the designer prefers the URL.
 
 **A title's month is its `watchDate`, so a watched title with no date counts nowhere.** That
 is deliberate and is FIL-30's acceptance criterion. Three more rules in

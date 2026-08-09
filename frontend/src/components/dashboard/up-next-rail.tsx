@@ -37,24 +37,27 @@ function Cards({ titles }: { titles: UpNextTitle[] }) {
     // backend caps this at the seven cards DSH-6 draws, so overflow is rare.
     <ul className="flex w-full items-start gap-[16px] overflow-x-auto">
       {titles.map((title) => (
-        <li key={title.id} className="flex w-[120px] shrink-0 flex-col gap-[10px]">
-          <Poster
-            posterPath={title.posterPath}
-            name={title.name}
-            size="w185"
-            className="h-[170px] w-[120px] rounded-[10px]"
-          />
-          <div className="flex flex-col gap-[2px]">
-            <p className="truncate text-[13px] font-semibold" title={title.name}>
-              {title.name}
-            </p>
-            <p className="text-text-tertiary text-[11.5px] leading-[1.4]">
-              {/* "{year} · {type}", or just the type when the year is unknown (A17). */}
-              {[title.year, title.type === 'movie' ? 'Movie' : 'Series']
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          </div>
+        <li key={title.id} className="w-[120px] shrink-0">
+          {/* LIB-7 / A15: a card opens that title's detail screen. */}
+          <Link href={`/titles/${title.id}`} className="flex flex-col gap-[10px]">
+            <Poster
+              posterPath={title.posterPath}
+              name={title.name}
+              size="w185"
+              className="h-[170px] w-[120px] rounded-[10px]"
+            />
+            <div className="flex flex-col gap-[2px]">
+              <p className="truncate text-[13px] font-semibold" title={title.name}>
+                {title.name}
+              </p>
+              <p className="text-text-tertiary text-[11.5px] leading-[1.4]">
+                {/* "{year} · {type}", or just the type when the year is unknown (A17). */}
+                {[title.year, title.type === 'movie' ? 'Movie' : 'Series']
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+          </Link>
         </li>
       ))}
     </ul>
@@ -74,7 +77,7 @@ function EmptyRail() {
        * navigates somewhere sensible beats one that 404s.
        */}
       <Link
-        href="/library"
+        href="/titles/new"
         className="bg-accent text-text-on-accent mt-[12px] rounded-[12px] px-[20px] py-[13px] text-[14px] font-semibold"
       >
         Add your first title

@@ -33,7 +33,7 @@ export function PickerLocked({ picker }: { picker: PickerGateState }) {
          * exist yet. Library is the nearest real destination.
          */}
         <Link
-          href="/library"
+          href="/titles/new"
           className="bg-accent text-text-on-accent mt-[10px] rounded-[12px] px-[20px] py-[13px] text-[14px] font-semibold"
         >
           Add your first title

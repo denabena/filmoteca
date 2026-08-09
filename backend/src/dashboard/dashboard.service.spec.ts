@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Title } from '@prisma/client';
 import { PickerGateService } from '../picker/picker-gate.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { TitlesRepository } from '../titles/titles.repository';
 import { DashboardService, UP_NEXT_DEFAULT_LIMIT } from './dashboard.service';
 import { parseMonth } from './month';
@@ -23,7 +24,7 @@ function watched(
       watchDate: new Date(Date.UTC(2026, 9, day)),
       ...rest,
     }),
-    genre: { name: genre },
+    genre: { name: genre, colorSlot: 2 },
   };
 }
 
@@ -54,6 +55,7 @@ describe('DashboardService', () => {
   const findFirst = jest.fn();
   const count = jest.fn();
   const getGateState = jest.fn();
+  const findFirstPick = jest.fn();
 
   let dashboard: DashboardService;
 
@@ -64,12 +66,17 @@ describe('DashboardService', () => {
     getGateState
       .mockReset()
       .mockResolvedValue({ unlocked: false, ratedCount: 0, threshold: 3 });
+    findFirstPick.mockReset().mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DashboardService,
         { provide: TitlesRepository, useValue: { findMany, findFirst, count } },
         { provide: PickerGateService, useValue: { getState: getGateState } },
+        {
+          provide: PrismaService,
+          useValue: { pick: { findFirst: findFirstPick } },
+        },
       ],
     }).compile();
 
@@ -151,7 +158,7 @@ describe('DashboardService', () => {
           status: 'watching',
           year: 2022,
         }),
-        genre: { name: 'Sci-Fi' },
+        genre: { name: 'Sci-Fi', colorSlot: 1 },
       });
 
       await expect(dashboard.getContinueWatching(USER)).resolves.toEqual({
@@ -169,7 +176,7 @@ describe('DashboardService', () => {
     it('carries no progress fields', async () => {
       findFirst.mockResolvedValue({
         ...title({ status: 'watching' }),
-        genre: { name: 'Sci-Fi' },
+        genre: { name: 'Sci-Fi', colorSlot: 1 },
       });
 
       const hero = await dashboard.getContinueWatching(USER);
@@ -280,7 +287,11 @@ describe('DashboardService', () => {
 
       const stats = await dashboard.getMonthlyStats(USER, OCTOBER, IN_OCTOBER);
 
-      expect(stats.topGenre).toEqual({ name: 'Sci-Fi', count: 2 });
+      expect(stats.topGenre).toEqual({
+        name: 'Sci-Fi',
+        count: 2,
+        colorSlot: 2,
+      });
     });
 
     // Documented rule: highest count, then name A to Z. Without it the card would
@@ -293,7 +304,7 @@ describe('DashboardService', () => {
 
       const stats = await dashboard.getMonthlyStats(USER, OCTOBER, IN_OCTOBER);
 
-      expect(stats.topGenre).toEqual({ name: 'Drama', count: 1 });
+      expect(stats.topGenre).toEqual({ name: 'Drama', count: 1, colorSlot: 2 });
     });
 
     it('is absent for a month with nothing watched', async () => {
@@ -359,11 +370,81 @@ describe('DashboardService', () => {
     });
   });
 
+  describe('available months (FIL-40)', () => {
+    // A dropdown that cannot select the month you are looking at is broken, so
+    // the current month is offered even with nothing in it.
+    it('always offers the current month, even when empty', async () => {
+      findMany.mockResolvedValue([]);
+
+      await expect(
+        dashboard.getAvailableMonths(USER, new Date('2026-10-17T00:00:00Z')),
+      ).resolves.toEqual(['2026-10']);
+    });
+
+    it('offers only months the user actually watched something in, newest first', async () => {
+      findMany.mockResolvedValue([
+        watched(3),
+        { ...watched(4), watchDate: new Date(Date.UTC(2026, 6, 2)) },
+        { ...watched(5), watchDate: new Date(Date.UTC(2025, 11, 30)) },
+      ]);
+
+      await expect(
+        dashboard.getAvailableMonths(USER, new Date('2026-10-17T00:00:00Z')),
+      ).resolves.toEqual(['2026-10', '2026-07', '2025-12']);
+    });
+
+    it('does not repeat the current month when it also has data', async () => {
+      findMany.mockResolvedValue([watched(3), watched(9)]);
+
+      const months = await dashboard.getAvailableMonths(
+        USER,
+        new Date('2026-10-17T00:00:00Z'),
+      );
+
+      expect(months).toEqual(['2026-10']);
+    });
+  });
+
+  describe('top pick (DSH-8, FIL-39)', () => {
+    it('is null when nothing has been generated', async () => {
+      await expect(dashboard.getTopPick(USER)).resolves.toBeNull();
+    });
+
+    it('reads rank 0 of the newest batch, skipping dismissed picks', async () => {
+      findFirstPick.mockResolvedValue({
+        id: 'pick-1',
+        name: 'Arrival',
+        year: 2016,
+        type: 'movie',
+        posterPath: '/arrival.jpg',
+        reason: 'Because you rated Blade Runner 2049 highly.',
+        genre: { name: 'Sci-Fi', colorSlot: 1 },
+      });
+
+      await expect(dashboard.getTopPick(USER)).resolves.toEqual({
+        id: 'pick-1',
+        name: 'Arrival',
+        year: 2016,
+        type: 'movie',
+        genre: 'Sci-Fi',
+        posterPath: '/arrival.jpg',
+        reason: 'Because you rated Blade Runner 2049 highly.',
+      });
+
+      expect(findFirstPick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: USER, state: { not: 'dismissed' } },
+          orderBy: [{ generatedAt: 'desc' }, { rank: 'asc' }],
+        }),
+      );
+    });
+  });
+
   describe('summary', () => {
     it('combines the hero, the rail and the stats for one dashboard request', async () => {
       findFirst.mockResolvedValue({
         ...title({ name: 'Severance', status: 'watching' }),
-        genre: { name: 'Sci-Fi' },
+        genre: { name: 'Sci-Fi', colorSlot: 1 },
       });
       // getSummary issues two findMany calls with different filters. Routing on
       // the status keeps them apart, and keeps the stats rows carrying the genre
@@ -381,7 +462,11 @@ describe('DashboardService', () => {
       expect(summary.upNext).toHaveLength(1);
       expect(summary.stats.month).toBe('2026-10');
       expect(summary.stats.watched.count).toBe(1);
-      expect(summary.stats.topGenre).toEqual({ name: 'Drama', count: 1 });
+      expect(summary.stats.topGenre).toEqual({
+        name: 'Drama',
+        count: 1,
+        colorSlot: 2,
+      });
     });
 
     // FIL-67's acceptance criterion: the teaser and the Picker page must read the

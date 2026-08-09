@@ -80,7 +80,7 @@ function FilledHero({ title }: { title: ContinueWatchingTitle }) {
             Resume
           </button>
           <Link
-            href="/library"
+            href={`/titles/${title.id}`}
             className="bg-surface-card-raised border-border-strong text-text-primary rounded-[12px] border px-[20px] py-[13px] text-[14px] font-semibold"
           >
             Details

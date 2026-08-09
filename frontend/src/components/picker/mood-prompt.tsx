@@ -103,7 +103,7 @@ export function MoodPrompt({ onGenerating }: { onGenerating?: (busy: boolean) =>
           disabled={isPending}
           className="bg-accent text-text-on-accent rounded-[12px] px-[20px] py-[13px] text-[14px] font-semibold disabled:opacity-60"
         >
-          {isPending ? 'Picking…' : 'Surprise me'}
+          {isPending ? 'Generating...' : 'Surprise me'}
         </button>
       </div>
 
