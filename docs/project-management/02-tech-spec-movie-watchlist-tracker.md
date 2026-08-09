@@ -446,6 +446,44 @@ Only what the design implies:
 - **Responsiveness:** all frames are fixed 1440x1024 desktop. No breakpoints designed.
 - **Visual system:** the Foundations page is explicitly dark theme only, with surface tokens (canvas #0F1216, sidebar, card, raised, elevated, muted), a crimson accent, status tones (success green, warning amber, danger red, each with text and soft variants), and an eight-slot genre palette (crimson, amber, green, teal, blue, indigo, purple, pink). The Components page defines Button (primary/secondary/danger), Tag/Status, Section header, Input and Select fields, Stat, List row, Rating (0 to 5), Progress bar, Favorite toggle, Genre chip, Mood chip, and the Sidebar. Build these as shared components, they repeat across screens.
 
+### 5.1 Confirmed token values
+
+Read out of the design while building the sidebar (SHL-1) and the auth card (2.14, 2.15), so this is the subset those parts use, not the whole Foundations page. Treat a token name as the thing to reference in code; the hex is here so nobody has to eyedrop a screenshot.
+
+| Token | Value | Seen on |
+|---|---|---|
+| Canvas | `#0F1216` | page background, every frame |
+| Surface/Sidebar | `#0B0E12` | sidebar column |
+| Surface/Card | `#181C22` | auth card |
+| Surface/Card Raised | `#1F242B` | active nav item, input fields, secondary button |
+| Surface/Elevated | `#262C34` | avatar circle |
+| Border/Default | `#262C34` | card border, divider lines |
+| Border/Strong | `#353D48` | input and secondary-button border |
+| Brand/Accent | `#F0455F` | logo tile, active nav icon, links, primary button |
+| Text/Primary | `#F4F6F8` | headings, active nav label, field values |
+| Text/Secondary | `#A6ADB8` | inactive nav labels, field labels, body copy |
+| Text/Tertiary | `#6C7480` | section overlines, inactive nav icons, captions, helper text |
+| Text/On Accent | `#FFFFFF` | primary button label |
+| Status/Danger Text | `#F08A83` | all field error messages (19, 20, 22 to 25) |
+
+Note that **Border/Default and Surface/Elevated are the same hex**, `#262C34`. Two names, one value: keep them distinct in code, because either could be re-themed independently.
+
+Type styles, all Inter unless stated:
+
+| Style | Definition | Used for |
+|---|---|---|
+| Brand/Wordmark | Space Grotesk Bold 20, letter-spacing -1% | "Scene" in the sidebar |
+| Display/M | Space Grotesk Bold 24, line-height 1.16, letter-spacing -1% | auth card headings |
+| Body/M | Regular 14, line-height 1.5 | supporting copy, field values |
+| Body/S | Regular 13, line-height 1.5 | helper text, error messages, "or" |
+| Label/L | Medium 14 | nav item labels |
+| Label/M | Medium 13 | form field labels |
+| Label/S | Medium 12 | avatar initials |
+| Strong/M | Semi Bold 14 | button labels, footer links |
+| Strong/S | Semi Bold 13 | "Forgot password?", profile name |
+| Overline | Medium 11, letter-spacing 8% | sidebar section labels, card overlines |
+| Caption | Regular 11.5, line-height 1.4 | profile email |
+
 ## 6. Assumptions log
 
 Numbered so teachers can review each one. Three are **retired**: they were written when the file had 17 frames and frames 18 to 25 answered them.

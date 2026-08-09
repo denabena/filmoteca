@@ -4,14 +4,27 @@ const path = require('path');
 // node_modules. Run each app's eslint from that app's directory (paths made
 // relative to it) so the right config + plugins resolve. Prettier is shared and
 // can format any staged file from the repo root.
+
+// Every path is single-quoted before it goes into a command string. Two real
+// cases break an unquoted path, and both stay invisible until they bite:
+//   - a clone directory containing a space, e.g. "DECODE Academy", which splits
+//     one path into two arguments;
+//   - App Router route groups, e.g. `src/app/(shell)/page.tsx`, whose
+//     parentheses are bash syntax and abort the whole command.
+// An embedded single quote is closed, escaped and reopened, since that is the
+// one character single quoting cannot carry on its own.
+const quote = (file) => `'${file.split("'").join(`'\\''`)}'`;
+
+const quoteAll = (files) => files.map(quote).join(' ');
+
 module.exports = {
   // Backend (NestJS) - ESLint --fix, then Prettier.
   'backend/**/*.ts': (filenames) => {
     const cwd = path.join(process.cwd(), 'backend');
     const files = filenames.map((f) => path.relative(cwd, f));
     return [
-      `bash -c "cd backend && npx eslint --fix ${files.join(' ')}"`,
-      `prettier --write ${filenames.join(' ')}`,
+      `bash -c "cd backend && npx eslint --fix ${quoteAll(files)}"`,
+      `prettier --write ${quoteAll(filenames)}`,
     ];
   },
 
@@ -20,8 +33,8 @@ module.exports = {
     const cwd = path.join(process.cwd(), 'frontend');
     const files = filenames.map((f) => path.relative(cwd, f));
     return [
-      `bash -c "cd frontend && npx eslint --fix ${files.join(' ')}"`,
-      `prettier --write ${filenames.join(' ')}`,
+      `bash -c "cd frontend && npx eslint --fix ${quoteAll(files)}"`,
+      `prettier --write ${quoteAll(filenames)}`,
     ];
   },
 
@@ -31,6 +44,6 @@ module.exports = {
   // made the hook log read as if it were reformatting them on every install.
   '{backend,frontend}/**/*.{js,html,css,scss,json,md}': (filenames) => {
     const files = filenames.filter((f) => !f.endsWith('package-lock.json'));
-    return files.length ? [`prettier --write ${files.join(' ')}`] : [];
+    return files.length ? [`prettier --write ${quoteAll(files)}`] : [];
   },
 };

@@ -4,8 +4,8 @@ A starter repo for Decode Academy final projects: a **Next.js** frontend talking
 **NestJS** backend, with the tooling you are expected to use on a real team already wired
 up (git hooks, Conventional Commits, CI, per-app linting and tests).
 
-Take a copy, build your project in it. It is deliberately small: one feature works end to
-end, and the rest is yours.
+Take a copy, build your project in it. It is deliberately small: an app shell, accounts, a
+database and one example endpoint, and the rest is yours.
 
 ## Getting your own copy
 
@@ -39,21 +39,29 @@ so this stays safe.
 
 ## What works today
 
-**The greeting.** The simplest possible path from browser to API:
+**The frontend app shell.** A fixed sidebar with the four views beside it, at `/`
+(Dashboard), `/library`, `/picker` and `/settings`. The pages themselves are placeholders;
+the sidebar is real, including the active-route highlight and the profile footer. Start at
+[`frontend/src/components/sidebar/sidebar.tsx`](frontend/src/components/sidebar/sidebar.tsx)
+and [`frontend/src/app/(shell)/layout.tsx`](<frontend/src/app/(shell)/layout.tsx>).
+
+The footer profile is still mocked, in one place only:
+[`frontend/src/lib/current-user.ts`](frontend/src/lib/current-user.ts). Accounts now exist
+(see below), so wiring it to the real signed-in user is a small change confined to that
+file.
+
+**The greeting.** The simplest possible path from browser to API, and the shortest code to
+read first if you want to see how a Nest controller and service fit together
+([`backend/src/app.controller.ts`](backend/src/app.controller.ts)):
 
 ```text
-browser  ->  Next.js page (:4200)  ->  fetch on the server  ->  NestJS (:3000)
-                                                                GET /api/hello
-                                                                { "message": "..." }
+curl http://localhost:3000/api/hello  ->  { "message": "..." }
 ```
 
-Open the home page and you see a greeting that came from the backend. The relevant files
-are [`frontend/src/app/page.tsx`](frontend/src/app/page.tsx) and
-[`backend/src/app.controller.ts`](backend/src/app.controller.ts). Both are short. Read
-them first.
-
-If the backend is not running, the page says so instead of crashing, which is a useful
-thing to notice: the frontend handles the failure rather than pretending it cannot happen.
+Note that nothing in the frontend calls it any more: the page that did was replaced by the
+dashboard route. Wiring the frontend to a real endpoint is your job, and
+[`frontend/src/app/(shell)/layout.tsx`](<frontend/src/app/(shell)/layout.tsx>) shows where a
+server-side read belongs.
 
 **Accounts, and a database.** Sign-up and sign-in run on Neon Auth, and the API verifies
 who you are without ever seeing your session cookie:
@@ -168,8 +176,9 @@ cd backend && npm run start:dev     # http://localhost:3000
 cd frontend && npm run dev          # http://localhost:4200
 ```
 
-Open <http://localhost:4200>. You should see "Frontend + Backend connected" with the
-message fetched from the API.
+Open <http://localhost:4200>. You should see the Scene sidebar on the left with
+"Dashboard" highlighted, and a placeholder dashboard beside it. Clicking through Library,
+Picker and Settings moves the highlight.
 
 ### Verify the backend directly
 
@@ -278,18 +287,25 @@ backend/                  NestJS 11 API on :3000
 
 frontend/                 Next.js 16 (App Router) + React 19 on :4200
   src/
-    lib/auth/
-      server.ts           Server-side Neon Auth. Holds the cookie secret
-      client.ts           Browser auth client
+    lib/
+      auth/
+        server.ts         Server-side Neon Auth. Holds the cookie secret
+        client.ts         Browser auth client
+      current-user.ts     The mocked signed-in profile, isolated here
+    components/
+      profile-provider.tsx  Client-side profile state
+      sidebar/            Sidebar, icons, React Testing Library example
     app/
-      layout.tsx          Root layout, wraps the app in Providers
+      layout.tsx          Root layout: fonts, Providers, html/body
       providers.tsx       Client boundary for NeonAuthUIProvider
-      page.tsx            Home route, async Server Component, fetches the API
-      page.test.tsx       React Testing Library example
+      globals.css         Tailwind v4 entry + Scene design tokens
+      (shell)/            Route group sharing the sidebar shell
+        layout.tsx        Sidebar + routed view
+        page.tsx          Dashboard (/)
+        library/, picker/, settings/
       api/auth/[...path]/  Proxies every auth call to Neon, server-side
       auth/[path]/        Sign-in, sign-up and the rest, one dynamic route
       me/                 Proves the whole auth chain end to end
-      globals.css         Tailwind v4 entry
   .env.example
 
 .claude/                  Claude Code skills, agents and permissions
@@ -299,9 +315,8 @@ CLAUDE.md                 Deeper architecture notes (also read by Claude Code)
 ```
 
 New backend features go in their own module folder under `backend/src/`. New frontend
-routes are folders under `frontend/src/app/` containing a `page.tsx`. Shared components
-go in `frontend/src/components/`, which does not exist yet: create it with your first
-one.
+routes that belong inside the sidebar shell are folders under `frontend/src/app/(shell)/`
+containing a `page.tsx`. Shared components go in `frontend/src/components/`.
 
 ## Commands
 
@@ -328,7 +343,7 @@ Database commands, backend only:
 | `npm run db:studio`         | Browse and edit data in a GUI                             |
 
 Both apps use Jest, so `npm test` runs once and exits. To filter:
-`npm test -- page` by path, `npm test -- -t "greeting"` by test name.
+`npm test -- sidebar` by path, `npm test -- -t "keyboard"` by test name.
 
 Neither app has a `typecheck` script. `npm run build` is the typecheck, because it runs
 `tsc` (backend) or `next build` (frontend). Run it before you push.
@@ -662,7 +677,7 @@ for the two supported setups and their trade-offs.
 | Symptom                                                         | Cause                                                                                                                                                           |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `http://localhost:3000/` returns 404                            | Correct. A global `api` prefix means the route is `/api/hello`. The prefix is set once in `backend/src/main.ts`                                                 |
-| Page says "Could not reach the API"                             | The backend is not running, or not on 3000                                                                                                                      |
+| A fetch from the frontend fails                                 | The backend is not running, or not on 3000                                                                                                                      |
 | `node: command not found`, but it worked via the AI agent       | Claude Code can ship its own bundled Node, which your terminal does not see. Install Node yourself, see [Prerequisites](#prerequisites)                         |
 | Servers die as soon as the AI assistant finishes                | Expected. Processes an assistant starts belong to its session. Start `npm run start:dev` and `npm run dev` in your own terminals and leave them open            |
 | Commits go through with no lint or message check                | You skipped the root `npm install`, so the hooks were never installed. Check with `git config core.hooksPath`, which should print `.husky/_`                    |
@@ -685,10 +700,10 @@ Things this boilerplate deliberately does not decide for you:
   a reasonable default) and add a `docker-compose.yml` if you want it containerised.
 - **Auth.** Not present. NestJS guards are the place for it; see the `backend-nestjs`
   rules.
-- **Shared types between the apps.** Right now `HelloResponse` is declared in
-  `backend/src/app.service.ts` and copied by hand into `frontend/src/app/page.tsx`.
-  Changing the response shape means editing both. Generating types from an OpenAPI spec is
-  the better answer once you have real endpoints.
+- **Shared types between the apps.** `HelloResponse` is declared in
+  `backend/src/app.service.ts` and nothing on the frontend mirrors it yet. The moment you
+  wire a real endpoint up you will be tempted to hand-copy the type; generating types from
+  an OpenAPI spec is the better answer.
 - **A chat feature.** There is no `/api/chat` route yet, and the env template ships no
   model-provider key. Add the variable your provider needs when you build the route,
   server-side only.
