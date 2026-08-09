@@ -1,5 +1,5 @@
 import type { MonthlyStats } from '@/lib/dashboard';
-import { monthLabel, previousMonthKey } from '@/lib/dashboard';
+import { genreColorClass, monthLabel, previousMonthKey } from '@/lib/dashboard';
 import { Icon } from './icon';
 
 /**
@@ -114,13 +114,23 @@ function Stars({ rating }: { rating: number | null }) {
 
 function TopGenreCard({ topGenre }: { topGenre: MonthlyStats['topGenre'] }) {
   return (
-    <StatCard rule={topGenre ? 'bg-genre-6' : 'bg-surface-elevated'} overline="TOP GENRE">
+    <StatCard
+      // One colour per genre, from the genres row, so every screen that shows
+      // this genre uses the same slot (FIL-36).
+      rule={topGenre ? genreColorClass(topGenre.colorSlot) : 'bg-surface-elevated'}
+      overline="TOP GENRE"
+    >
       <p className="font-display text-[30px] leading-[1.1] font-bold tracking-[-0.45px]">
         {topGenre ? topGenre.name : '—'}
       </p>
       {topGenre ? (
         <p className="flex items-center gap-[7px] text-[12px] font-medium">
-          <Icon src="/icons/genre-dot.svg" className="size-[8px]" />
+          {/* A tinted circle rather than the exported dot, whose fill is baked in
+              and so cannot follow the genre's palette slot. */}
+          <span
+            className={`size-[8px] rounded-full ${genreColorClass(topGenre.colorSlot)}`}
+            aria-hidden="true"
+          />
           <span className="text-text-secondary">
             {topGenre.count} {topGenre.count === 1 ? 'title' : 'titles'} this month
           </span>

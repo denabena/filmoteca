@@ -1,6 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import type { ActivityStat, MonthlyStats, PickerGateState } from '@/lib/dashboard';
-import { monthLabel, posterUrl, previousMonthKey } from '@/lib/dashboard';
+import type { ActivityStat, MonthlyStats, PickerGateState, TopPick } from '@/lib/dashboard';
+import {
+  formatRuntime,
+  genreColorClass,
+  monthLabel,
+  posterUrl,
+  previousMonthKey,
+  shortenReason,
+} from '@/lib/dashboard';
 import { ContinueWatchingHero } from './continue-watching';
 import { PickerTeaser } from './picker-teaser';
 import { StatCards } from './stat-cards';
@@ -12,7 +19,7 @@ function stats(overrides: Partial<MonthlyStats> = {}): MonthlyStats {
     month: '2026-10',
     watched: { count: 12, trend: 3 },
     averageRating: 4.2,
-    topGenre: { name: 'Sci-Fi', count: 8 },
+    topGenre: { name: 'Sci-Fi', count: 8, colorSlot: 6 },
     activity: { buckets: [3, 5, 2, 4], total: 14, currentBucket: 3 },
     ...overrides,
   };
@@ -124,7 +131,7 @@ describe('StatCards', () => {
   });
 
   it('singularises a one-title genre', () => {
-    render(<StatCards stats={stats({ topGenre: { name: 'Crime', count: 1 } })} />);
+    render(<StatCards stats={stats({ topGenre: { name: 'Crime', count: 1, colorSlot: 4 } })} />);
 
     expect(screen.getByText('1 title this month')).toBeInTheDocument();
   });
@@ -198,18 +205,75 @@ describe('PickerTeaser', () => {
     ...overrides,
   });
 
+  const topPick: TopPick = {
+    id: 'pick-1',
+    name: 'Arrival',
+    year: 2016,
+    type: 'movie',
+    genre: 'Sci-Fi',
+    posterPath: null,
+    reason: 'You rated Blade Runner 2049 4.5 out of 5, and this is Sci-Fi too.',
+  };
+
   it('shows the locked state with progress towards the threshold', () => {
-    render(<PickerTeaser picker={gate()} />);
+    render(<PickerTeaser picker={gate()} topPick={null} />);
 
     expect(screen.getByText('PICKER LOCKED')).toBeInTheDocument();
-    expect(screen.getByText('1 of 3 rated')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Add a title/ })).toBeInTheDocument();
+    expect(screen.getByText(/1 of 3 rated/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Add a title/ })).toHaveAttribute(
+      'href',
+      '/titles/new',
+    );
   });
 
-  it('links through to the Picker once unlocked', () => {
-    render(<PickerTeaser picker={gate({ unlocked: true, ratedCount: 5 })} />);
+  // FIL-39: the teaser shows the real pick, and FIL-73 requires it to be the
+  // same one the Picker page lists first.
+  it('shows the real top pick when there is one', () => {
+    render(<PickerTeaser picker={gate({ unlocked: true, ratedCount: 5 })} topPick={topPick} />);
 
     expect(screen.getByText("TONIGHT'S PICK")).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Arrival' })).toBeInTheDocument();
+    expect(screen.getByText('2016 · Sci-Fi · Movie')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open Picker/ })).toHaveAttribute('href', '/picker');
+  });
+
+  it('stays locked-looking when unlocked but nothing is generated yet', () => {
+    render(<PickerTeaser picker={gate({ unlocked: true, ratedCount: 5 })} topPick={null} />);
+
+    expect(screen.getByRole('heading', { name: 'No pick yet' })).toBeInTheDocument();
+    expect(screen.getByText('Generate your first picks')).toBeInTheDocument();
+  });
+});
+
+describe('display helpers', () => {
+  it('maps a genre colour slot to a palette class', () => {
+    expect(genreColorClass(6)).toBe('bg-genre-6');
+    // Slot 8 has no confirmed hex yet, so it falls back rather than vanishing.
+    expect(genreColorClass(8)).toBe('bg-genre-1');
+  });
+
+  it.each([
+    [166, '2h 46m'],
+    [120, '2h'],
+    [45, '45m'],
+    [null, null],
+    [0, null],
+  ])('formats a runtime of %p as %p', (minutes, expected) => {
+    expect(formatRuntime(minutes)).toBe(expected);
+  });
+
+  it('leaves a short reason alone', () => {
+    expect(shortenReason('Short one.')).toBe('Short one.');
+  });
+
+  // The teaser shows less text than the Picker page. Cutting on a word boundary
+  // is a working decision, not a designed one.
+  it('cuts a long reason on a word boundary', () => {
+    const long = `${'word '.repeat(40)}end`;
+    const short = shortenReason(long);
+
+    expect(short.length).toBeLessThanOrEqual(101);
+    expect(short.endsWith('…')).toBe(true);
+    expect(short).not.toMatch(/wor…$/);
   });
 });

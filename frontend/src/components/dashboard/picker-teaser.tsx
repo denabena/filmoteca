@@ -1,16 +1,28 @@
 import Link from 'next/link';
-import type { PickerGateState } from '@/lib/dashboard';
+import type { PickerGateState, TopPick } from '@/lib/dashboard';
+import { shortenReason } from '@/lib/dashboard';
 import { Icon } from './icon';
+import { Poster } from './poster';
 
 /**
- * "Tonight's pick" (FIL-39), locked and unlocked.
+ * "Tonight's pick" (DSH-8, FIL-39), locked and unlocked.
  *
  * The unlock state comes from the same `PickerGateService` the Picker page reads,
- * carried in the dashboard's own response. That is the whole point of FIL-67: two
- * screens promise the Picker unlocks after "a few" titles, and they must never
+ * carried in the dashboard's own response. That is the point of FIL-67: two
+ * screens promise the Picker unlocks after "a few" titles and must never
  * disagree about whether it has.
+ *
+ * `topPick` is rank 0 of the newest batch, so it is the same card the Picker page
+ * shows first (FIL-73). It is null when the Picker is locked, and also when it is
+ * unlocked but nothing has been generated yet.
  */
-export function PickerTeaser({ picker }: { picker: PickerGateState }) {
+export function PickerTeaser({
+  picker,
+  topPick,
+}: {
+  picker: PickerGateState;
+  topPick: TopPick | null;
+}) {
   return (
     <section
       aria-labelledby="picker-teaser-heading"
@@ -18,9 +30,57 @@ export function PickerTeaser({ picker }: { picker: PickerGateState }) {
     >
       <p className="text-accent flex items-center gap-[8px] text-[11px] font-medium tracking-[0.88px]">
         <Icon src="/icons/sparkle.svg" className="size-[15px]" />
-        {picker.unlocked ? "TONIGHT'S PICK" : 'PICKER LOCKED'}
+        {topPick ? "TONIGHT'S PICK" : 'PICKER LOCKED'}
       </p>
 
+      {topPick ? <FilledTeaser pick={topPick} /> : <LockedTeaser picker={picker} />}
+    </section>
+  );
+}
+
+function FilledTeaser({ pick }: { pick: TopPick }) {
+  const meta = [pick.year, pick.genre, pick.type === 'movie' ? 'Movie' : 'Series']
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <>
+      <div className="flex w-full items-center gap-[14px]">
+        <Poster
+          posterPath={pick.posterPath}
+          name={pick.name}
+          size="w185"
+          className="h-[80px] w-[56px] shrink-0 rounded-[6px]"
+        />
+        <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+          <h2
+            id="picker-teaser-heading"
+            className="truncate text-[16px] leading-[1.3] font-semibold tracking-[-0.08px]"
+          >
+            {pick.name}
+          </h2>
+          <p className="text-text-secondary text-[13px] leading-[1.5]">{meta}</p>
+        </div>
+      </div>
+
+      {/* Shortened here, in full on the Picker page. See shortenReason for why
+          the cut is a working decision rather than a designed one. */}
+      <p className="text-text-secondary text-[13px] leading-[1.5]">{shortenReason(pick.reason)}</p>
+
+      <Link
+        href="/picker"
+        className="text-accent flex items-center gap-[7px] text-[14px] font-semibold"
+      >
+        Open Picker
+        <Icon src="/icons/arrow-right.svg" className="size-[10px]" />
+      </Link>
+    </>
+  );
+}
+
+function LockedTeaser({ picker }: { picker: PickerGateState }) {
+  return (
+    <>
       <div className="flex w-full items-center gap-[14px]">
         <div
           className="bg-surface-muted h-[80px] w-[56px] shrink-0 rounded-[6px]"
@@ -31,39 +91,32 @@ export function PickerTeaser({ picker }: { picker: PickerGateState }) {
             id="picker-teaser-heading"
             className="text-[16px] leading-[1.3] font-semibold tracking-[-0.08px]"
           >
-            {picker.unlocked ? 'Ready when you are' : 'No pick yet'}
+            No pick yet
           </h2>
+          {/*
+           * The design's caption is "Add titles to unlock". The count is appended
+           * because "a few" tells nobody how far off they are and the gate already
+           * returns it. A27 leaves the threshold undecided anyway.
+           */}
           <p className="text-text-secondary text-[13px] leading-[1.5]">
             {picker.unlocked
-              ? 'Open the Picker to generate tonight&rsquo;s three'
-              : `${picker.ratedCount} of ${picker.threshold} rated`}
+              ? 'Generate your first picks'
+              : `Add titles to unlock · ${picker.ratedCount} of ${picker.threshold} rated`}
           </p>
         </div>
       </div>
 
-      {/*
-       * The design shows a real pick here with its title, meta and reason. That
-       * needs the dashboard response to carry the current top pick, which it does
-       * not: FIL-65 stores picks and the teaser reads `picker` only.
-       *
-       * Rather than invent a pick or fetch a second endpoint from a Server
-       * Component that already has one round trip, the unlocked state invites the
-       * user through to the Picker. Adding `topPick` to DashboardSummary is a
-       * small backend change and the honest fix; raised on the ticket.
-       */}
       <p className="text-text-secondary text-[13px] leading-[1.5]">
-        {picker.unlocked
-          ? 'Scene Picker suggests what to watch based on what you have rated.'
-          : 'Scene Picker suggests what to watch once you have added and rated a few titles.'}
+        Scene Picker suggests what to watch once you&rsquo;ve added and rated a few titles.
       </p>
 
       <Link
-        href={picker.unlocked ? '/picker' : '/library'}
+        href={picker.unlocked ? '/picker' : '/titles/new'}
         className="text-accent flex items-center gap-[7px] text-[14px] font-semibold"
       >
         {picker.unlocked ? 'Open Picker' : 'Add a title'}
         <Icon src="/icons/arrow-right.svg" className="size-[10px]" />
       </Link>
-    </section>
+    </>
   );
 }

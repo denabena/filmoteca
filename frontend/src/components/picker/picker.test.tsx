@@ -70,6 +70,19 @@ describe('MoodPrompt', () => {
     expect(chip).not.toBeChecked();
   });
 
+  // FIL-70 specifies this label exactly.
+  it('labels the button Generating... while it runs', async () => {
+    const user = userEvent.setup();
+    let release: (() => void) | undefined;
+    generatePicks.mockImplementation(() => new Promise<void>((resolve) => (release = resolve)));
+    render(<MoodPrompt />);
+
+    await user.click(screen.getByRole('button', { name: 'Surprise me' }));
+    expect(await screen.findByRole('button', { name: 'Generating...' })).toBeDisabled();
+
+    release?.();
+  });
+
   it('sends the selected moods', async () => {
     const user = userEvent.setup();
     render(<MoodPrompt />);
@@ -179,11 +192,18 @@ describe('PickerLocked', () => {
 });
 
 describe('PickSkeletons', () => {
+  // FIL-70 specifies this copy exactly.
+  it('shows the designed generating heading and caption', () => {
+    render(<PickSkeletons />);
+
+    expect(screen.getByRole('heading', { name: 'Finding your next watch...' })).toBeInTheDocument();
+    expect(screen.getByText(/Analyzing your ratings, favorites, and tonight/)).toBeInTheDocument();
+  });
+
   it('announces that it is busy and draws three placeholders', () => {
     const { container } = render(<PickSkeletons />);
 
-    expect(screen.getByText('Generating your picks')).toBeInTheDocument();
     expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
-    expect(container.querySelectorAll('[aria-hidden="true"]')).toHaveLength(3);
+    expect(screen.getAllByTestId('pick-skeleton')).toHaveLength(3);
   });
 });
