@@ -34,6 +34,34 @@ export function SceneLogo({ className }: IconProps) {
   );
 }
 
+/**
+ * Sign-out glyph: a door with an arrow leaving it. Inherits `currentColor` like
+ * the nav icons so the sidebar footer can tint it.
+ *
+ * Placeholder geometry until FIL-20's exact affordance is pulled from the
+ * Dashboard sidebar frame; it follows the design system's stroke style.
+ */
+export function SignOutIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 17H4.5A1.5 1.5 0 0 1 3 15.5v-11A1.5 1.5 0 0 1 4.5 3H8" />
+      <path d="M13 14l4-4-4-4" />
+      <path d="M17 10H8" />
+    </svg>
+  );
+}
+
 /** Four squares, 9x9 on an 11px pitch. */
 export function DashboardIcon({ className }: IconProps) {
   return (

@@ -28,12 +28,17 @@
 @theme {
   --color-canvas: #0f1216;
   --color-surface-sidebar: #0b0e12;
+  --color-surface-card: #181c22;
   --color-surface-card-raised: #1f242b;
   --color-surface-elevated: #262c34;
 
   --color-text-primary: #f4f6f8;
   --color-text-secondary: #a6adb8;
   --color-text-tertiary: #6c7480;
+  --color-text-on-accent: #ffffff;
+
+  --color-border-default: #262c34;
+  --color-border-strong: #353d48;
 
   --color-accent: #f0455f;
 
