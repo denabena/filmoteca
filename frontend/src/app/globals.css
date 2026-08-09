@@ -21,9 +21,9 @@
  * (tech spec section 5), so there is no light variant and no
  * prefers-color-scheme switch here.
  *
- * Only tokens with a value confirmed in the design are declared. Surfaces and
- * status tones that this screen does not use are deliberately absent rather
- * than guessed: add them in the ticket that needs them.
+ * Only tokens with a value confirmed in the design are declared. Anything the
+ * built screens do not use is deliberately absent rather than guessed: add it in
+ * the ticket that needs it. Everything below was read out of Figma, not inferred.
  */
 @theme {
   --color-canvas: #0f1216;
@@ -31,6 +31,7 @@
   --color-surface-card: #181c22;
   --color-surface-card-raised: #1f242b;
   --color-surface-elevated: #262c34;
+  --color-surface-muted: #232a32;
 
   --color-text-primary: #f4f6f8;
   --color-text-secondary: #a6adb8;
@@ -41,6 +42,32 @@
   --color-border-strong: #353d48;
 
   --color-accent: #f0455f;
+
+  /*
+   * Status tones. Each has a solid, a text and a soft (background) variant, and
+   * they are not interchangeable: the solid is for the stat card's accent rule,
+   * the text one carries enough contrast for 12px type on a dark surface, and the
+   * soft one is only ever a pill background.
+   */
+  --color-status-success: #46c08a;
+  --color-status-success-text: #74d4a8;
+  --color-status-success-soft: #15271f;
+  --color-status-warning: #e0a63d;
+  --color-status-warning-text: #f0c570;
+  --color-status-warning-soft: #2a2214;
+
+  /*
+   * The genre palette. Eight slots, twelve genres, so slots repeat by design:
+   * `Genre.colorSlot` in the backend indexes into this. Slot 8 (pink) is not on
+   * any screen built so far, so it is not declared yet.
+   */
+  --color-genre-1: #f0455f;
+  --color-genre-2: #e8a33d;
+  --color-genre-3: #46c08a;
+  --color-genre-4: #33b1c4;
+  --color-genre-5: #4e86e8;
+  --color-genre-6: #7b6ef0;
+  --color-genre-7: #a85cd6;
 
   /* Loaded by next/font in src/app/layout.tsx. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;

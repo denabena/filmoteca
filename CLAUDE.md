@@ -148,6 +148,18 @@ page did: no CORS is involved and there is no client-side loading state. CORS is
 the backend anyway (`main.ts`) for genuinely client-side fetches, allowing origin
 `FRONTEND_URL`.
 
+**The frontend calls the backend through `src/lib/api.ts`, never `fetch` directly.**
+`apiFetch` reads the Neon Auth session, mints a short-lived JWT and sends it as a bearer
+token, which is the chain `/me` proved end to end. It imports `server-only`, so pulling it
+into a Client Component fails at build time rather than shipping a token minter to the
+browser.
+
+**Design tokens live in `frontend/src/app/globals.css` and only confirmed values go in.**
+Everything there was read out of Figma, including the eight-slot genre palette and the
+status tones. `Genre.colorSlot` in the backend indexes into `--color-genre-1..7`; slot 8 is
+undeclared because no built screen uses it. Add a token in the ticket that needs it rather
+than guessing a value.
+
 **Configuration goes through ConfigService.** `ConfigModule.forRoot({ isGlobal: true })`
 is registered in `backend/src/app.module.ts`, so it reads `backend/.env` at startup and
 `ConfigService` is injectable everywhere without re-importing the module. Read values
