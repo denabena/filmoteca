@@ -34,6 +34,8 @@ backend/          NestJS 11 API, port 3000, its own package.json + node_modules
   prisma.config.ts  Prisma 7 CLI config. Excluded from tsconfig.build.json
   src/prisma/     PrismaService, global
   src/auth/       NeonAuthGuard, @CurrentUser, GET /api/me
+  src/profile/    ProfileService, created on first authenticated request
+  src/titles/     TitlesRepository, the only code allowed to query `titles`
 frontend/         Next.js 16 + React 19, port 4200, its own package.json + node_modules
   src/lib/auth/   Neon Auth server and client instances
   src/app/api/auth/[...path]/  Proxies auth calls to Neon, server-side
@@ -175,6 +177,33 @@ and the verified JWT already carries the caller's identity, so no join is needed
 who is asking. Note the table is `neon_auth."user"`, **not** `users_sync`; that name
 belongs to the older Stack Auth integration and does not exist here.
 
+**Every title query goes through `TitlesRepository`, and that is a rule, not a
+preference.** `backend/src/titles/titles.repository.ts` is the only file permitted to touch
+`prisma.title`. Each method takes the owner as its first argument and merges `userId` into
+the query itself, so a feature module cannot express an unscoped title query without going
+around the file. Inject `TitlesRepository`, never `PrismaService`, when you need titles.
+
+Two details in there are load-bearing. `userId` is spread **after** the caller's `where`
+(`{ ...args.where, userId }`), so `where: { userId: someoneElse }` cannot override the
+owner; reverse the spread and one test fails, which is the point of that test. And a row
+owned by someone else is reported as **404, not 403**, because a 403 confirms the row exists
+and so leaks another account's data by omission.
+
+**The catalogue is not the watchlist.** `Title` rows are per-user watchlist entries. The
+TMDB catalogue is a global candidate pool for the Picker, and TMDB's terms cap caching at
+six months, so it gets re-imported. That is why `year`, `runtime`, `director` and
+`posterPath` are **copied onto `Title`** rather than joined from a catalogue row: a user's
+own entry must not change or break when the catalogue refreshes. Those four are null for a
+hand-typed title, because per A17 no form anywhere captures them.
+
+**The twelve genres are seeded by the migration, not a seed script.** A24 retires
+createGenre and editGenre, so the set is fixed reference data. Putting the rows in
+`20260809175645_add_title_genre_and_ownership/migration.sql` means any environment that has
+migrated has them, with no second manual step next to the migrate that already has to be run
+by hand on deploy. `Genre` also carries `tmdbMovieId` and `tmdbTvId`, which holds the two
+TMDB vocabularies as data: Thriller, Romance, Horror and Fantasy have a null `tmdbTvId`
+because TV has no equivalent, and re-mapping is then an UPDATE rather than a re-import.
+
 **Auth lives in the frontend, and the backend only verifies.** Next.js owns the sign-in UI
 and the session cookie. Because the API is a separate origin it never receives that cookie,
 so the frontend mints a short-lived JWT at `/api/auth/token` and sends it as a bearer
@@ -199,7 +228,16 @@ no longer allowed in `schema.prisma` and live in `prisma.config.ts`, which must 
 ESM relying on `import.meta.url`, which cannot compile to CommonJS and so breaks every Jest
 suite. And `prisma.config.ts` is excluded in `tsconfig.build.json`: it sits at the package
 root, so including it makes tsc infer that root as the common root and emit
-`dist/src/main.js` instead of `dist/main.js`, silently breaking `start:prod`.
+`dist/src/main.js` instead of `dist/main.js`, silently breaking `start:prod`. `rootDir` is
+now pinned to `./src` as well, so that mistake fails loudly at build time instead.
+
+**A stale `tsconfig.build.tsbuildinfo` will hand you a half-empty `dist` and exit 0.** That
+file is the incremental-build cache, gitignored, and it lives at the package root rather than
+inside `dist/`. So deleting `dist/` does not invalidate it: the next `npm run build` decides
+most files are unchanged, emits only the ones you touched, and reports success. You get a
+`dist/` containing your new module and nothing else, and the failure surfaces later as
+`Cannot find module '../prisma/prisma.service'`. When `dist/` looks wrong, delete both:
+`rm -rf dist *.tsbuildinfo && npm run build`.
 
 **`jose` ships ESM only, and that breaks two different things.** For Jest, both jest configs
 carry `transformIgnorePatterns` exempting it plus an inline `module: commonjs` tsconfig. For
