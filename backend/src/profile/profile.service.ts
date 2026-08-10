@@ -1,17 +1,31 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import type { Profile } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { Prisma, type Profile } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NeonAuthUser } from '../auth/neon-auth.guard';
 
-/** Onboarding / Settings preferences that can be updated on a profile (FIL-23). */
+/**
+ * Fields that can be updated on a profile via `PATCH /api/profile`. Partial: only
+ * the keys present are written. Onboarding writes the goal/genres (FIL-23),
+ * Settings adds the identity fields (FIL-74).
+ */
 export interface ProfilePreferencesInput {
   monthlyWatchGoal?: number;
   favoriteGenres?: string[];
+  firstName?: string;
+  lastName?: string;
+  email?: string;
 }
 
 /** Monthly watch goal bounds: 1-99, step 1, default 15 (A4, a working decision). */
 export const MONTHLY_GOAL_MIN = 1;
 export const MONTHLY_GOAL_MAX = 99;
+
+/** Pragmatic email shape check: a single @ with non-empty, dot-bearing sides. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Splits the single `name` Neon Auth stores into the first/last pair this app's
@@ -62,10 +76,11 @@ export class ProfileService {
    */
   async ensure(user: NeonAuthUser): Promise<Profile> {
     const { firstName, lastName } = splitName(user.name);
+    const email = user.email?.trim().toLowerCase() || null;
 
     return this.prisma.profile.upsert({
       where: { userId: user.id },
-      create: { userId: user.id, firstName, lastName },
+      create: { userId: user.id, firstName, lastName, email },
       update: {},
     });
   }
@@ -83,7 +98,7 @@ export class ProfileService {
     userId: string,
     input: ProfilePreferencesInput,
   ): Promise<Profile> {
-    const data: { monthlyWatchGoal?: number; favoriteGenres?: string[] } = {};
+    const data: Prisma.ProfileUpdateInput = {};
 
     if (input.monthlyWatchGoal !== undefined) {
       const goal = input.monthlyWatchGoal;
@@ -110,6 +125,44 @@ export class ProfileService {
       ];
     }
 
-    return this.prisma.profile.update({ where: { userId }, data });
+    // Identity fields (FIL-74, A35). First/last name become separate stored
+    // values here for the first time. Editing email stores the profile email
+    // only; it does NOT change the Neon Auth sign-in credential (undesigned).
+    if (input.firstName !== undefined) {
+      const firstName = input.firstName.trim();
+      if (!firstName) {
+        throw new BadRequestException('First name is required.');
+      }
+      data.firstName = firstName;
+    }
+
+    if (input.lastName !== undefined) {
+      const lastName = input.lastName.trim();
+      if (!lastName) {
+        throw new BadRequestException('Last name is required.');
+      }
+      data.lastName = lastName;
+    }
+
+    if (input.email !== undefined) {
+      const email = input.email.trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email)) {
+        throw new BadRequestException('Enter a valid email.');
+      }
+      data.email = email;
+    }
+
+    try {
+      return await this.prisma.profile.update({ where: { userId }, data });
+    } catch (error) {
+      // Unique violation on the email column: another account already has it.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('This email is already in use.');
+      }
+      throw error;
+    }
   }
 }

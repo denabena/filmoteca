@@ -47,6 +47,12 @@ model Profile {
   firstName String? @map("first_name")
   lastName  String? @map("last_name")
 
+  /// Contact email shown and edited in Settings (SET-6), seeded from the Neon
+  /// Auth token on first login. Unique so Settings can reject an email already
+  /// taken. NOTE: this is the app-level profile email; it does NOT re-point the
+  /// Neon Auth sign-in credential (changing that is undesigned, A-note on FIL-74).
+  email String? @unique @map("email")
+
   /// The "15 titles / month" stepper on onboarding and in Settings.
   monthlyWatchGoal Int @default(15) @map("monthly_watch_goal")
 
