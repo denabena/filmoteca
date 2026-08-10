@@ -41,6 +41,8 @@
   --color-border-strong: #353d48;
 
   --color-accent: #f0455f;
+  /* Brand/Accent Soft: selected genre-chip fill (first used on FIL-26). */
+  --color-accent-soft: #33212a;
 
   /* Loaded by next/font in src/app/layout.tsx. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
