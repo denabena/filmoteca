@@ -55,6 +55,11 @@ model Profile {
 
   newReleaseReminders Boolean @default(false) @map("new_release_reminders")
 
+  /// Favorite genres picked in onboarding (GNR-4) and editable in Settings. The
+  /// 12 chips from frame 03 (A7), stored as their identifiers. Any number is
+  /// allowed, including none (A6), so it defaults to empty rather than null.
+  favoriteGenres String[] @default([]) @map("favorite_genres")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

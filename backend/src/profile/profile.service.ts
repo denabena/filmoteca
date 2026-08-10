@@ -1,7 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Profile } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NeonAuthUser } from '../auth/neon-auth.guard';
+
+/** Onboarding / Settings preferences that can be updated on a profile (FIL-23). */
+export interface ProfilePreferencesInput {
+  monthlyWatchGoal?: number;
+  favoriteGenres?: string[];
+}
+
+/** Monthly watch goal bounds: 1-99, step 1, default 15 (A4, a working decision). */
+export const MONTHLY_GOAL_MIN = 1;
+export const MONTHLY_GOAL_MAX = 99;
 
 /**
  * Splits the single `name` Neon Auth stores into the first/last pair this app's
@@ -58,5 +68,48 @@ export class ProfileService {
       create: { userId: user.id, firstName, lastName },
       update: {},
     });
+  }
+
+  /**
+   * Updates the onboarding / Settings preferences on the signed-in profile
+   * (FIL-23, GOL-5 and GNR-4). Partial by design: only the fields present are
+   * touched, so the goal step and the genre step can each write on their own,
+   * and Settings can reuse the same endpoint later.
+   *
+   * The caller must have ensured the profile exists (the controller does). Scope
+   * is the `userId`, so one account can never write another's row.
+   */
+  async updatePreferences(
+    userId: string,
+    input: ProfilePreferencesInput,
+  ): Promise<Profile> {
+    const data: { monthlyWatchGoal?: number; favoriteGenres?: string[] } = {};
+
+    if (input.monthlyWatchGoal !== undefined) {
+      const goal = input.monthlyWatchGoal;
+      if (
+        !Number.isInteger(goal) ||
+        goal < MONTHLY_GOAL_MIN ||
+        goal > MONTHLY_GOAL_MAX
+      ) {
+        throw new BadRequestException(
+          `monthlyWatchGoal must be a whole number from ${MONTHLY_GOAL_MIN} to ${MONTHLY_GOAL_MAX}.`,
+        );
+      }
+      data.monthlyWatchGoal = goal;
+    }
+
+    if (input.favoriteGenres !== undefined) {
+      if (!Array.isArray(input.favoriteGenres)) {
+        throw new BadRequestException('favoriteGenres must be an array.');
+      }
+      // Any number is allowed, including none (A6); de-duplicate so the same chip
+      // cannot be stored twice.
+      data.favoriteGenres = [
+        ...new Set(input.favoriteGenres.map((genre) => String(genre))),
+      ];
+    }
+
+    return this.prisma.profile.update({ where: { userId }, data });
   }
 }
