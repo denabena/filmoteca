@@ -167,5 +167,39 @@ describe('ProfileService', () => {
         }),
       ).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it('rejects a default type other than movie or series', async () => {
+      await expect(
+        service.updatePreferences('neon-user-123', {
+          defaultType: 'documentary',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])(
+      'persists the reminders toggle (%p)',
+      async (flag) => {
+        await service.updatePreferences('neon-user-123', {
+          newReleaseReminders: flag,
+        });
+
+        expect(update).toHaveBeenCalledWith({
+          where: { userId: 'neon-user-123' },
+          data: { newReleaseReminders: flag },
+        });
+      },
+    );
+
+    it('stores a valid default type', async () => {
+      await service.updatePreferences('neon-user-123', {
+        defaultType: 'series',
+      });
+
+      expect(update).toHaveBeenCalledWith({
+        where: { userId: 'neon-user-123' },
+        data: { defaultType: 'series' },
+      });
+    });
   });
 });

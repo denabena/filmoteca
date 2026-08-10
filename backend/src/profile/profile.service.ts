@@ -18,6 +18,8 @@ export interface ProfilePreferencesInput {
   firstName?: string;
   lastName?: string;
   email?: string;
+  defaultType?: string;
+  newReleaseReminders?: boolean;
 }
 
 /** Monthly watch goal bounds: 1-99, step 1, default 15 (A4, a working decision). */
@@ -150,6 +152,24 @@ export class ProfileService {
         throw new BadRequestException('Enter a valid email.');
       }
       data.email = email;
+    }
+
+    // Watch preferences (FIL-75, SET-3/SET-4). The reminders flag is stored and
+    // nothing more: there is no notification system behind it (A28).
+    if (input.defaultType !== undefined) {
+      if (input.defaultType !== 'movie' && input.defaultType !== 'series') {
+        throw new BadRequestException(
+          'defaultType must be "movie" or "series".',
+        );
+      }
+      data.defaultType = input.defaultType;
+    }
+
+    if (input.newReleaseReminders !== undefined) {
+      if (typeof input.newReleaseReminders !== 'boolean') {
+        throw new BadRequestException('newReleaseReminders must be a boolean.');
+      }
+      data.newReleaseReminders = input.newReleaseReminders;
     }
 
     try {
