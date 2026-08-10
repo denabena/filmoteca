@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SceneLogo } from '@/components/sidebar/icons';
+import { WelcomePanel } from '@/components/welcome-panel';
 
 /**
  * The Welcome screen (Figma frame 01 · WEL-1, WEL-2, WEL-5), the marketing pitch
@@ -40,7 +41,12 @@ export default function WelcomePage() {
           >
             Get started
           </Link>
-          {/* WEL-3 "Already have an account? Sign in" ships in FIL-22. */}
+          <div className="flex items-center gap-1.5 text-[14px]">
+            <span className="leading-[1.5] text-text-tertiary">Already have an account?</span>
+            <Link href="/auth/sign-in" className="font-semibold text-accent">
+              Sign in
+            </Link>
+          </div>
         </div>
 
         <p className="text-[11.5px] leading-[1.4] text-text-tertiary">
@@ -48,12 +54,7 @@ export default function WelcomePage() {
         </p>
       </div>
 
-      {/* Decorative right panel (WEL-4) ships in FIL-22. */}
-      <div
-        aria-hidden="true"
-        className="hidden flex-1 lg:block"
-        style={{ background: 'linear-gradient(to bottom, #13161c, #1f1a30)' }}
-      />
+      <WelcomePanel />
     </main>
   );
 }

@@ -21,6 +21,12 @@ describe('WelcomePage', () => {
     );
   });
 
+  it('sends "Sign in" to the sign in screen', () => {
+    render(<WelcomePage />);
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth/sign-in');
+  });
+
   it('shows the footer', () => {
     render(<WelcomePage />);
 
