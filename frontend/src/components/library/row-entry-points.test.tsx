@@ -9,6 +9,9 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/library',
 }));
 
+/** The heart's own behaviour is `favorite-heart.test.tsx`; here it just needs one. */
+const noopToggle = jest.fn().mockResolvedValue({ favorite: false });
+
 function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
   return {
     id: 'title-1',
@@ -34,7 +37,7 @@ function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
 function renderTable(titles: TitleListItem[] = [title()]) {
   return render(
     <div onClick={(event) => event.preventDefault()}>
-      <TitlesTable titles={titles} />
+      <TitlesTable titles={titles} onToggleFavorite={noopToggle} />
     </div>,
   );
 }
@@ -135,12 +138,20 @@ describe('Library row entry points (FIL-47)', () => {
       ).toBeInTheDocument();
     });
 
+    /*
+     * The row's own stop is the title link. The heart (FIL-46) sits between them
+     * because it is a real button too, which is the point: every control in the
+     * row is reachable on its own rather than folded into one row-sized target.
+     */
     it('is a separate tab stop from the row', async () => {
       const user = userEvent.setup();
       renderTable();
 
       await user.tab();
       expect(screen.getByRole('link', { name: 'Dune: Part Two' })).toHaveFocus();
+
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Add Dune: Part Two to favorites' })).toHaveFocus();
 
       await user.tab();
       expect(screen.getByRole('button', { name: 'More actions for Dune: Part Two' })).toHaveFocus();
@@ -185,7 +196,7 @@ describe('Library row entry points (FIL-47)', () => {
       const user = userEvent.setup();
       renderTable();
 
-      await user.click(screen.getByText('Dune: Part Two is not a favorite'));
+      await user.click(screen.getByRole('button', { name: 'Add Dune: Part Two to favorites' }));
 
       expect(mockPush).not.toHaveBeenCalled();
     });

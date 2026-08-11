@@ -1,3 +1,4 @@
+import { toggleFavorite } from '@/app/(shell)/titles/actions';
 import { LibraryTabs } from '@/components/library/library-tabs';
 import { TitlesTable } from '@/components/library/titles-table';
 import { AddTitleButton } from '@/components/shell/add-title-button';
@@ -25,7 +26,7 @@ export default async function LibraryPage() {
 
       <div className="flex flex-1 flex-col gap-[18px] px-[40px] pb-[40px]">
         <LibraryTabs
-          table={<TitlesTable titles={titles} />}
+          table={<TitlesTable titles={titles} onToggleFavorite={toggleFavorite} />}
           genres={<PanelPlaceholder>The genre cards land in FIL-50.</PanelPlaceholder>}
         />
       </div>

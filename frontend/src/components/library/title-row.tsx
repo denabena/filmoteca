@@ -6,6 +6,7 @@ import type { MouseEvent } from 'react';
 import { Icon } from '@/components/dashboard/icon';
 import { genreColorClass } from '@/lib/dashboard';
 import { STATUS_TONE, titleCaption, type TitleListItem } from '@/lib/library';
+import { FavoriteHeart, type ToggleFavorite } from './favorite-heart';
 import { RowMenu } from './row-menu';
 import { StarRating } from './star-rating';
 
@@ -33,7 +34,21 @@ import { StarRating } from './star-rating';
  * `data-row-action` rather than by naming the heart and the kebab. A marker means
  * a cell that gains a button later cannot silently start navigating.
  */
-export function TitleRow({ title }: { title: TitleListItem }) {
+export function TitleRow({
+  title,
+  onToggleFavorite,
+}: {
+  title: TitleListItem;
+  /**
+   * The favourite Server Action, handed in from the page rather than imported
+   * (FIL-46). A `'use client'` module that imports a `'use server'` one pulls
+   * `next/cache` and the whole Next server runtime into its graph, which is
+   * invisible in the browser bundle but fatal under jsdom, where the row cannot
+   * be rendered at all. Passing the action down is Next's documented shape for
+   * this and keeps the row testable with a plain stub.
+   */
+  onToggleFavorite: ToggleFavorite;
+}) {
   const status = STATUS_TONE[title.status];
   const router = useRouter();
   const href = `/titles/${title.id}`;
@@ -102,7 +117,12 @@ export function TitleRow({ title }: { title: TitleListItem }) {
       </td>
 
       <td className="px-[16px] py-[14px]">
-        <FavoriteMark favorite={title.favorite} name={title.name} />
+        <FavoriteHeart
+          titleId={title.id}
+          titleName={title.name}
+          favorite={title.favorite}
+          onToggle={onToggleFavorite}
+        />
       </td>
 
       <td className="py-[14px] pr-[24px] pl-[16px]">
@@ -132,27 +152,6 @@ function PosterTile({ colorSlot }: { colorSlot: number }) {
       aria-hidden="true"
     >
       <Icon src="/icons/play.svg" className="h-[12px] w-[9px]" />
-    </span>
-  );
-}
-
-/**
- * The FAV column heart, as a static mark.
- *
- * FIL-46 turns this into a button with an optimistic toggle. Until then it is
- * still labelled for a screen reader, because an icon-only cell that says
- * nothing is unreadable whether or not it is clickable, and it carries
- * `data-row-action` already so a click on it never navigates the row.
- */
-function FavoriteMark({ favorite, name }: { favorite: boolean; name: string }) {
-  return (
-    <span data-row-action className={favorite ? 'text-accent' : 'text-text-tertiary'}>
-      <span aria-hidden="true" className="text-[15px]">
-        {favorite ? '♥' : '♡'}
-      </span>
-      <span className="sr-only">
-        {favorite ? `${name} is a favorite` : `${name} is not a favorite`}
-      </span>
     </span>
   );
 }
