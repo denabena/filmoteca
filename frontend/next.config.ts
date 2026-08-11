@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Externalise only `jose`: require it from node_modules at runtime rather than
+  // bundling it. Turbopack otherwise pulls jose's `webapi` ESM build into the RSC
+  // graph and mis-analyses it ("export unprotected doesn't exist"), breaking every
+  // server route that reads the session. `@neondatabase/auth` and `better-auth`
+  // must stay bundled - they import Next internals like `next/headers`, which only
+  // resolve inside the bundle - so only jose is external here.
+  serverExternalPackages: ['jose'],
 };
 
 export default nextConfig;
