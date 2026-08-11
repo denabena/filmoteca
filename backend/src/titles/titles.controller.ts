@@ -6,16 +6,19 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import type { Title, TitleStatus, TitleType } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { NeonAuthGuard, type NeonAuthUser } from '../auth/neon-auth.guard';
+import {
+  parseTitlePayload,
+  TITLE_STATUSES,
+  type TitlePayloadBody,
+} from './title-payload';
 import { TitlesRepository, type TitleWithGenre } from './titles.repository';
-
-const TYPES: TitleType[] = ['movie', 'series'];
-const STATUSES: TitleStatus[] = ['watched', 'watching', 'want_to_watch'];
 
 /**
  * The two orders the library's "Sort: Recent" dropdown offers.
@@ -27,18 +30,6 @@ const STATUSES: TitleStatus[] = ['watched', 'watching', 'want_to_watch'];
  */
 const SORTS = ['recent', 'oldest'] as const;
 type TitleSort = (typeof SORTS)[number];
-
-/** What the Add title form (08) sends. */
-export interface CreateTitleBody {
-  name?: unknown;
-  type?: unknown;
-  status?: unknown;
-  genreId?: unknown;
-  watchDate?: unknown;
-  rating?: unknown;
-  note?: unknown;
-  favorite?: unknown;
-}
 
 /** The genre as a library row draws it: a coloured dot and a name. */
 export interface TitleListGenre {
@@ -107,9 +98,9 @@ export class TitlesController {
     // absent one really does mean all three, which is the dropdown's "All".
     let status: TitleStatus | undefined;
     if (query.status) {
-      if (!isOneOf(query.status, STATUSES)) {
+      if (!isOneOf(query.status, TITLE_STATUSES)) {
         throw new BadRequestException({
-          message: `status must be one of ${STATUSES.join(', ')}`,
+          message: `status must be one of ${TITLE_STATUSES.join(', ')}`,
           fields: ['status'],
         });
       }
@@ -154,68 +145,49 @@ export class TitlesController {
   /**
    * Creates a title (ADD-3).
    *
-   * Validated by hand, since the project has no class-validator. Required fields
-   * are name, type, genre and status per ADD-6; watch date, rating and note stay
-   * optional whatever the status is, because A20 ties none of them together.
+   * Validated by hand through `parseTitlePayload`, since the project has no
+   * class-validator. The rules live there rather than here because Edit (FIL-55)
+   * has to apply exactly the same ones.
    */
   @Post()
   @UseGuards(NeonAuthGuard)
   async createTitle(
     @CurrentUser() user: NeonAuthUser,
-    @Body() body: CreateTitleBody,
+    @Body() body: TitlePayloadBody,
   ): Promise<Title> {
-    const name = typeof body?.name === 'string' ? body.name.trim() : '';
-    const missing: string[] = [];
+    return this.titles.create(user.id, parseTitlePayload(body));
+  }
 
-    if (!name) missing.push('name');
-    if (!isOneOf(body?.type, TYPES)) missing.push('type');
-    if (!isOneOf(body?.status, STATUSES)) missing.push('status');
-    if (typeof body?.genreId !== 'string' || !body.genreId)
-      missing.push('genreId');
-
-    if (missing.length > 0) {
-      // Named per field rather than a single "invalid payload", so the form can
-      // mark the offending inputs (FIL-59) instead of showing one banner.
-      throw new BadRequestException({
-        message: 'Some required fields are missing or invalid',
-        fields: missing,
-      });
-    }
-
-    // Half-star units, 0 to 10 (A21). Anything else is a bug in the caller
-    // rather than something to silently clamp.
-    if (body.rating !== undefined && body.rating !== null) {
-      const rating = Number(body.rating);
-      if (!Number.isInteger(rating) || rating < 0 || rating > 10) {
-        throw new BadRequestException({
-          message: 'rating must be a whole number of half-stars, 0 to 10',
-          fields: ['rating'],
-        });
-      }
-    }
-
-    return this.titles.create(user.id, {
-      name,
-      type: body.type as TitleType,
-      status: body.status as TitleStatus,
-      genreId: body.genreId as string,
-      watchDate:
-        typeof body.watchDate === 'string' && body.watchDate
-          ? new Date(`${body.watchDate}T00:00:00.000Z`)
-          : null,
-      rating:
-        body.rating === undefined || body.rating === null
-          ? null
-          : Number(body.rating),
-      note:
-        typeof body.note === 'string' && body.note.trim()
-          ? body.note.trim()
-          : null,
-      favorite: body.favorite === true,
-    });
+  /**
+   * Saves the Edit title modal (EDT-2 · FIL-55).
+   *
+   * A PUT rather than a PATCH, because the modal submits the whole form: every
+   * field it draws is present on every save, so an omitted optional field means
+   * "cleared" rather than "leave it alone". A PATCH would make those two cases
+   * indistinguishable and leave a note the user just emptied still in the row.
+   *
+   * **Nothing is recomputed here, and that is the design working.** A23 lists
+   * what a change has to settle: genre counts, dashboard stats, watch activity
+   * and Picker gating. Every one of those is derived on read, so a genre change
+   * moves both counts and a watch-date change re-buckets two months' stats on the
+   * next request with no invalidation hook on this path. The place that would
+   * break is a stored aggregate, and there is deliberately none.
+   *
+   * Ownership is the repository's: another user's id is a 404 with nothing
+   * written, because `update` checks before it writes.
+   */
+  @Put(':id')
+  @UseGuards(NeonAuthGuard)
+  async updateTitle(
+    @CurrentUser() user: NeonAuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: TitlePayloadBody,
+  ): Promise<Title> {
+    return this.titles.update(user.id, id, parseTitlePayload(body));
   }
 }
 
+/** Membership test for the query-string enums above. */
 function isOneOf<T extends string>(
   value: unknown,
   allowed: readonly T[],
