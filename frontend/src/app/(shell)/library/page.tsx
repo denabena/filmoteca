@@ -1,4 +1,5 @@
 import { toggleFavorite } from '@/app/(shell)/titles/actions';
+import { LibraryEmpty } from '@/components/library/library-empty';
 import { LibraryTabs } from '@/components/library/library-tabs';
 import { TitlesTable } from '@/components/library/titles-table';
 import { AddTitleButton } from '@/components/shell/add-title-button';
@@ -26,7 +27,22 @@ export default async function LibraryPage() {
 
       <div className="flex flex-1 flex-col gap-[18px] px-[40px] pb-[40px]">
         <LibraryTabs
-          table={<TitlesTable titles={titles} onToggleFavorite={toggleFavorite} />}
+          table={
+            /*
+             * The no-titles state (FIL-48), decided on the unfiltered count. The
+             * no-results state is a different screen and belongs to FIL-49, which
+             * owns the search that produces it: a library with ten titles and a
+             * query matching none has not earned "Add your first movie or show".
+             *
+             * The tabs and the controls around this stay visible, which frame 13
+             * draws deliberately.
+             */
+            titles.length === 0 ? (
+              <LibraryEmpty />
+            ) : (
+              <TitlesTable titles={titles} onToggleFavorite={toggleFavorite} />
+            )
+          }
           genres={<PanelPlaceholder>The genre cards land in FIL-50.</PanelPlaceholder>}
         />
       </div>
