@@ -22,6 +22,7 @@ describe('TitlesController', () => {
   const findByIdOrThrow = jest.fn();
   const findManyWithGenre = jest.fn();
   const update = jest.fn();
+  const remove = jest.fn();
 
   let controller: TitlesController;
 
@@ -37,13 +38,20 @@ describe('TitlesController', () => {
     findByIdOrThrow.mockReset().mockResolvedValue({});
     findManyWithGenre.mockReset().mockResolvedValue([]);
     update.mockReset().mockResolvedValue({});
+    remove.mockReset().mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TitlesController],
       providers: [
         {
           provide: TitlesRepository,
-          useValue: { create, findByIdOrThrow, findManyWithGenre, update },
+          useValue: {
+            create,
+            findByIdOrThrow,
+            findManyWithGenre,
+            update,
+            delete: remove,
+          },
         },
       ],
     })
@@ -232,6 +240,32 @@ describe('TitlesController', () => {
       update.mockRejectedValue(new NotFoundException('Title not found'));
 
       await expect(controller.updateTitle(user, ID, valid)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  /*
+   * FIL-56, the routing half. What a delete does to the genre list, the stats,
+   * the Picker gate and the dashboard rails is in `title-deletion.spec.ts`,
+   * because those are claims about a second read and cannot be made against a
+   * mock that returns whatever it was told to.
+   */
+  describe('deleting a title (FIL-56)', () => {
+    const ID = '5e0b1b6a-0f2c-4d8e-9a3b-2c1d4e5f6a7b';
+
+    it('deletes the caller’s own title and returns no content', async () => {
+      await expect(controller.deleteTitle(user, ID)).resolves.toBeUndefined();
+
+      expect(remove).toHaveBeenCalledWith('neon-user-123', ID);
+    });
+
+    // "Not yours" and "not there" are the same answer on purpose: a 403 would
+    // confirm the row exists, so a sweep of ids would map another library.
+    it('surfaces the repository’s 404 rather than swallowing it', async () => {
+      remove.mockRejectedValue(new NotFoundException('Title not found'));
+
+      await expect(controller.deleteTitle(user, ID)).rejects.toThrow(
         NotFoundException,
       );
     });
