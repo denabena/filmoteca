@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LibraryPage from '@/app/(shell)/library/page';
+import type { TitleListItem } from '@/lib/library';
 import { LibraryTabs } from './library-tabs';
 
 // The page renders AddTitleButton, which is a next/link; usePathname is stubbed
@@ -10,13 +11,41 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/library',
 }));
 
+// The page is an async Server Component that fetches its rows. `apiFetch` imports
+// `server-only` and mints a session token, so it is stubbed rather than run; what
+// these tests are about is what the page does with the rows, not how it gets them.
+const mockApiFetch = jest.fn();
+jest.mock('../../lib/api', () => ({ apiFetch: (path: string) => mockApiFetch(path) }));
+
+function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
+  return {
+    id: 'title-1',
+    name: 'Dune: Part Two',
+    year: 2024,
+    type: 'movie',
+    genre: { id: 'g-scifi', slug: 'sci-fi', name: 'Sci-Fi', colorSlot: 6 },
+    status: 'watched',
+    rating: 10,
+    favorite: true,
+    ...overrides,
+  };
+}
+
+/** The page is async, so it is awaited into an element rather than rendered. */
+async function renderPage(titles: TitleListItem[] = [title()]) {
+  mockApiFetch.mockResolvedValue(titles);
+  return render(await LibraryPage());
+}
+
 function renderTabs() {
   return render(<LibraryTabs table={<p>Titles table</p>} genres={<p>Genre cards</p>} />);
 }
 
+beforeEach(() => mockApiFetch.mockReset());
+
 describe('Library page header (FIL-44)', () => {
-  it('shows the designed overline and title through the shared header', () => {
-    render(<LibraryPage />);
+  it('shows the designed overline and title through the shared header', async () => {
+    await renderPage();
 
     expect(screen.getByText('Your watchlist')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Library' })).toBeInTheDocument();
@@ -24,10 +53,16 @@ describe('Library page header (FIL-44)', () => {
 
   // AC3: the modal is the intercepting route, so the button must be a link to the
   // real URL. A plain button would open a modal that no URL can reach.
-  it('puts an Add title action in the header that the modal route can intercept', () => {
-    render(<LibraryPage />);
+  it('puts an Add title action in the header that the modal route can intercept', async () => {
+    await renderPage();
 
     expect(screen.getByRole('link', { name: 'Add title' })).toHaveAttribute('href', '/titles/new');
+  });
+
+  it('reads the rows from the titles list endpoint', async () => {
+    await renderPage();
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/titles');
   });
 });
 
@@ -119,7 +154,7 @@ describe('Library tab switcher (FIL-44)', () => {
   // cannot touch it. Rendering the whole page proves the wiring, not just intent.
   it('leaves the page header untouched when the tab changes', async () => {
     const user = userEvent.setup();
-    render(<LibraryPage />);
+    await renderPage();
 
     await user.click(screen.getByRole('tab', { name: 'Genres' }));
 
