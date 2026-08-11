@@ -22,6 +22,7 @@ import {
   type TitlePayloadBody,
 } from './title-payload';
 import { TitlesRepository, type TitleWithGenre } from './titles.repository';
+import { TitlesService } from './titles.service';
 
 /**
  * The two orders the library's "Sort: Recent" dropdown offers.
@@ -75,7 +76,10 @@ export interface ListTitlesQuery {
  */
 @Controller('titles')
 export class TitlesController {
-  constructor(private readonly titles: TitlesRepository) {}
+  constructor(
+    private readonly titles: TitlesRepository,
+    private readonly actions: TitlesService,
+  ) {}
 
   /**
    * The library list (LIB-3 · FIL-41).
@@ -214,6 +218,42 @@ export class TitlesController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.titles.delete(user.id, id);
+  }
+
+  /**
+   * Marks a title watched from the row menu (MNU-2 · FIL-57).
+   *
+   * The full row comes back rather than a 204, because the row that fired this
+   * has to redraw its status chip and the dashboard cards behind it change too:
+   * returning the stored state is what lets the client render the server's answer
+   * instead of the one it assumed.
+   *
+   * The watch-date and idempotence decisions are in `TitlesService.markWatched`,
+   * which is where the reasoning belongs rather than duplicated here.
+   */
+  @Post(':id/watched')
+  @UseGuards(NeonAuthGuard)
+  async markWatched(
+    @CurrentUser() user: NeonAuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Title> {
+    return this.actions.markWatched(user.id, id);
+  }
+
+  /**
+   * Flips the FAV column heart (LIB-6 · FIL-57).
+   *
+   * Returns the stored row, whose `favorite` is the resulting state. FIL-46
+   * updates the heart optimistically and reverts on failure, so it needs
+   * something to confirm against; a 204 would leave it asserting its own guess.
+   */
+  @Post(':id/favorite')
+  @UseGuards(NeonAuthGuard)
+  async toggleFavorite(
+    @CurrentUser() user: NeonAuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Title> {
+    return this.actions.toggleFavorite(user.id, id);
   }
 }
 

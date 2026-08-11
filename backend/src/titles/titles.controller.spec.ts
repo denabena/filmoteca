@@ -4,6 +4,7 @@ import type { TitleStatus } from '@prisma/client';
 import { NeonAuthGuard, type NeonAuthUser } from '../auth/neon-auth.guard';
 import { TitlesController } from './titles.controller';
 import { TitlesRepository } from './titles.repository';
+import { TitlesService } from './titles.service';
 
 const user: NeonAuthUser = {
   id: 'neon-user-123',
@@ -23,6 +24,8 @@ describe('TitlesController', () => {
   const findManyWithGenre = jest.fn();
   const update = jest.fn();
   const remove = jest.fn();
+  const markWatched = jest.fn();
+  const toggleFavorite = jest.fn();
 
   let controller: TitlesController;
 
@@ -40,6 +43,9 @@ describe('TitlesController', () => {
     update.mockReset().mockResolvedValue({});
     remove.mockReset().mockResolvedValue({});
 
+    markWatched.mockReset().mockResolvedValue({});
+    toggleFavorite.mockReset().mockResolvedValue({});
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TitlesController],
       providers: [
@@ -52,6 +58,10 @@ describe('TitlesController', () => {
             update,
             delete: remove,
           },
+        },
+        {
+          provide: TitlesService,
+          useValue: { markWatched, toggleFavorite },
         },
       ],
     })
@@ -268,6 +278,52 @@ describe('TitlesController', () => {
       await expect(controller.deleteTitle(user, ID)).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  /*
+   * FIL-57, the routing half. What the two actions do to a stored row, and what
+   * the dashboard says afterwards, is in `titles.service.spec.ts`.
+   */
+  describe('the row-level quick actions (FIL-57)', () => {
+    const ID = '5e0b1b6a-0f2c-4d8e-9a3b-2c1d4e5f6a7b';
+
+    it('marks watched as the caller', async () => {
+      await controller.markWatched(user, ID);
+
+      expect(markWatched).toHaveBeenCalledWith('neon-user-123', ID);
+    });
+
+    it('toggles the favourite as the caller', async () => {
+      await controller.toggleFavorite(user, ID);
+
+      expect(toggleFavorite).toHaveBeenCalledWith('neon-user-123', ID);
+    });
+
+    it.each([
+      ['markWatched', () => controller.markWatched(user, ID), markWatched],
+      [
+        'toggleFavorite',
+        () => controller.toggleFavorite(user, ID),
+        toggleFavorite,
+      ],
+    ])(
+      "surfaces %s's 404 for another user's title",
+      async (_name, call, spy) => {
+        spy.mockRejectedValue(new NotFoundException('Title not found'));
+
+        await expect(call()).rejects.toThrow(NotFoundException);
+      },
+    );
+
+    // The heart is updated optimistically and reverted on failure (FIL-46), so
+    // the response has to carry something to confirm against.
+    it('returns the stored row so the client confirms rather than assumes', async () => {
+      toggleFavorite.mockResolvedValue({ id: ID, favorite: true });
+
+      await expect(controller.toggleFavorite(user, ID)).resolves.toMatchObject({
+        favorite: true,
+      });
     });
   });
 
