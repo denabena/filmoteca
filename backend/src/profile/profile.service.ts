@@ -7,11 +7,19 @@ import type { NeonAuthUser } from '../auth/neon-auth.guard';
 export interface ProfilePreferencesInput {
   monthlyWatchGoal?: number;
   favoriteGenres?: string[];
+  avatarUrl?: string | null;
 }
 
 /** Monthly watch goal bounds: 1-99, step 1, default 15 (A4, a working decision). */
 export const MONTHLY_GOAL_MIN = 1;
 export const MONTHLY_GOAL_MAX = 99;
+
+/**
+ * Cap on the stored avatar data URL (~256 KB). The frontend downsizes to a small
+ * square first, so a larger payload means it was not resized and should be
+ * refused rather than bloating the row.
+ */
+export const AVATAR_MAX_LENGTH = 256_000;
 
 /**
  * Splits the single `name` Neon Auth stores into the first/last pair this app's
@@ -83,7 +91,11 @@ export class ProfileService {
     userId: string,
     input: ProfilePreferencesInput,
   ): Promise<Profile> {
-    const data: { monthlyWatchGoal?: number; favoriteGenres?: string[] } = {};
+    const data: {
+      monthlyWatchGoal?: number;
+      favoriteGenres?: string[];
+      avatarUrl?: string | null;
+    } = {};
 
     if (input.monthlyWatchGoal !== undefined) {
       const goal = input.monthlyWatchGoal;
@@ -108,6 +120,25 @@ export class ProfileService {
       data.favoriteGenres = [
         ...new Set(input.favoriteGenres.map((genre) => String(genre))),
       ];
+    }
+
+    // Profile photo (Settings "Change photo"). `null` clears it; a string must be
+    // a small image data URL. Not in the design (A28); added on request.
+    if (input.avatarUrl !== undefined) {
+      if (input.avatarUrl === null) {
+        data.avatarUrl = null;
+      } else if (
+        typeof input.avatarUrl !== 'string' ||
+        !input.avatarUrl.startsWith('data:image/')
+      ) {
+        throw new BadRequestException('avatarUrl must be an image data URL.');
+      } else if (input.avatarUrl.length > AVATAR_MAX_LENGTH) {
+        throw new BadRequestException(
+          'The image is too large. Please choose a smaller one.',
+        );
+      } else {
+        data.avatarUrl = input.avatarUrl;
+      }
     }
 
     return this.prisma.profile.update({ where: { userId }, data });

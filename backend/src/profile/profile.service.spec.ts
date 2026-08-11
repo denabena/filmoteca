@@ -39,6 +39,7 @@ describe('ProfileService', () => {
     defaultType: 'movie',
     newReleaseReminders: false,
     favoriteGenres: [],
+    avatarUrl: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   };
@@ -115,6 +116,39 @@ describe('ProfileService', () => {
       await expect(
         service.updatePreferences('neon-user-123', { monthlyWatchGoal: 10 }),
       ).resolves.toBe(stored);
+    });
+
+    it('rejects an avatar that is not an image data URL', async () => {
+      await expect(
+        service.updatePreferences('neon-user-123', {
+          avatarUrl: 'https://example.com/a.png',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an oversized avatar', async () => {
+      const huge = 'data:image/png;base64,' + 'A'.repeat(300_000);
+      await expect(
+        service.updatePreferences('neon-user-123', { avatarUrl: huge }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('stores a valid avatar data URL and clears it with null', async () => {
+      await service.updatePreferences('neon-user-123', {
+        avatarUrl: 'data:image/jpeg;base64,abc',
+      });
+      expect(update).toHaveBeenCalledWith({
+        where: { userId: 'neon-user-123' },
+        data: { avatarUrl: 'data:image/jpeg;base64,abc' },
+      });
+
+      await service.updatePreferences('neon-user-123', { avatarUrl: null });
+      expect(update).toHaveBeenLastCalledWith({
+        where: { userId: 'neon-user-123' },
+        data: { avatarUrl: null },
+      });
     });
   });
 });

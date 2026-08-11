@@ -47,6 +47,12 @@ model Profile {
   firstName String? @map("first_name")
   lastName  String? @map("last_name")
 
+  /// Profile photo as a small data URL (Settings "Change photo"). Not in the
+  /// original design (A28 has no upload flow) - added on request. Stored inline
+  /// because there is no object storage wired up; the frontend downsizes to a
+  /// ~256px square first so the row stays small.
+  avatarUrl String? @map("avatar_url") @db.Text
+
   /// The "15 titles / month" stepper on onboarding and in Settings.
   monthlyWatchGoal Int @default(15) @map("monthly_watch_goal")
 

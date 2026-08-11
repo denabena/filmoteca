@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthField } from '@/components/auth/auth-field';
 import { useProfile } from '@/components/profile-provider';
 import { ToggleSwitch } from '@/components/settings/toggle-switch';
 import { GOAL_MAX, GOAL_MIN } from '@/components/goal-stepper';
 import { avatarInitials } from '@/lib/current-user';
+import { fileToAvatarDataUrl } from '@/lib/image';
 
 /**
  * The Settings screen (Figma frame 17), inside the app shell. Three cards
@@ -31,6 +32,7 @@ interface ProfileResponse {
   defaultType: 'movie' | 'series';
   newReleaseReminders: boolean;
   favoriteGenres: string[];
+  avatarUrl: string | null;
 }
 
 interface FieldErrors {
@@ -66,6 +68,8 @@ export default function SettingsPage() {
   const [defaultType, setDefaultType] = useState<'movie' | 'series'>('movie');
   const [reminders, setReminders] = useState(false);
   const [genreCount, setGenreCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -87,6 +91,7 @@ export default function SettingsPage() {
         setDefaultType(profile.defaultType ?? 'movie');
         setReminders(Boolean(profile.newReleaseReminders));
         setGenreCount(profile.favoriteGenres?.length ?? 0);
+        setAvatarUrl(profile.avatarUrl ?? '');
       } catch {
         if (active) setFormError('Could not load your settings. Please refresh.');
       } finally {
@@ -133,6 +138,7 @@ export default function SettingsPage() {
           monthlyWatchGoal: Number(monthlyWatchGoal),
           defaultType,
           newReleaseReminders: reminders,
+          avatarUrl: avatarUrl || null,
         }),
       });
 
@@ -160,6 +166,22 @@ export default function SettingsPage() {
     }
   }
 
+  async function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset the input so picking the same file again still fires onChange.
+    event.target.value = '';
+    if (!file) return;
+
+    setFormError(null);
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      setAvatarUrl(dataUrl);
+      setSaved(false);
+    } catch {
+      setFormError('Could not read that image. Please try another.');
+    }
+  }
+
   const initials = avatarInitials({ firstName, lastName, email });
 
   return (
@@ -179,19 +201,47 @@ export default function SettingsPage() {
               Profile
             </h2>
             <div className="flex items-center gap-4">
-              <span
-                aria-hidden="true"
-                className="flex size-16 items-center justify-center rounded-full bg-surface-elevated text-[16px] font-semibold text-text-primary"
-              >
-                {initials}
-              </span>
-              {/* No upload flow anywhere (A28); non-functional for now. */}
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl}
+                  alt="Profile photo"
+                  className="size-16 rounded-full object-cover"
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="flex size-16 items-center justify-center rounded-full bg-surface-elevated text-[16px] font-semibold text-text-primary"
+                >
+                  {initials}
+                </span>
+              )}
+
+              {/* Not in the design (A28 has no upload flow); added on request.
+                  Downsized client-side and saved with the rest on Save changes. */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
               <button
                 type="button"
+                onClick={() => fileInputRef.current?.click()}
                 className="rounded-xl border border-border-strong bg-surface-card-raised px-5 py-[13px] text-[14px] font-semibold text-text-primary"
               >
                 Change photo
               </button>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl('')}
+                  className="text-[14px] font-medium text-text-tertiary hover:text-text-primary"
+                >
+                  Remove
+                </button>
+              )}
             </div>
             <div className="flex gap-3.5">
               <div className="flex flex-1 flex-col gap-[7px]">
