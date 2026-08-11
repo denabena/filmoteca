@@ -9,6 +9,7 @@ import {
   type TitleListItem,
 } from '@/lib/library';
 import type { ToggleFavorite } from './favorite-heart';
+import type { MarkWatched } from './row-menu-actions';
 import { LibraryControls } from './library-controls';
 import { LibraryEmpty } from './library-empty';
 import { LibraryTabs } from './library-tabs';
@@ -40,11 +41,13 @@ import { TitlesTable } from './titles-table';
 export function LibraryView({
   titles,
   onToggleFavorite,
+  onMarkWatched,
   genres,
   genresControls,
 }: {
   titles: TitleListItem[];
   onToggleFavorite: ToggleFavorite;
+  onMarkWatched: MarkWatched;
   genres: ReactNode;
   genresControls?: ReactNode;
 }) {
@@ -62,7 +65,11 @@ export function LibraryView({
         ) : visible.length === 0 ? (
           <NoResults filters={filters} onClear={() => setFilters(NO_FILTERS)} />
         ) : (
-          <TitlesTable titles={visible} onToggleFavorite={onToggleFavorite} />
+          <TitlesTable
+            titles={visible}
+            onToggleFavorite={onToggleFavorite}
+            onMarkWatched={onMarkWatched}
+          />
         )
       }
       genres={genres}

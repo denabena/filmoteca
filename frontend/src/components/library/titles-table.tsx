@@ -1,5 +1,6 @@
 import type { TitleListItem } from '@/lib/library';
 import type { ToggleFavorite } from './favorite-heart';
+import type { MarkWatched } from './row-menu-actions';
 import { TitleRow } from './title-row';
 
 /**
@@ -20,10 +21,13 @@ import { TitleRow } from './title-row';
 export function TitlesTable({
   titles,
   onToggleFavorite,
+  onMarkWatched,
 }: {
   titles: TitleListItem[];
   /** Forwarded to each row's heart. See `TitleRow` for why it is injected. */
   onToggleFavorite: ToggleFavorite;
+  /** Forwarded to each row's menu. See `TitleRow` for why it is injected. */
+  onMarkWatched: MarkWatched;
 }) {
   return (
     <div className="bg-surface-card border-border-default max-h-[calc(100vh-260px)] overflow-y-auto rounded-[18px] border">
@@ -58,7 +62,12 @@ export function TitlesTable({
         </thead>
         <tbody>
           {titles.map((title) => (
-            <TitleRow key={title.id} title={title} onToggleFavorite={onToggleFavorite} />
+            <TitleRow
+              key={title.id}
+              title={title}
+              onToggleFavorite={onToggleFavorite}
+              onMarkWatched={onMarkWatched}
+            />
           ))}
         </tbody>
       </table>

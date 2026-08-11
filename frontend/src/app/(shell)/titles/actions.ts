@@ -104,6 +104,32 @@ export async function updateTitle(
 }
 
 /**
+ * Marks a title watched from the row menu (MNU-2 · FIL-62).
+ *
+ * Returns `true` on success rather than throwing, for the same reason
+ * `toggleFavorite` does: a thrown Server Action reaching a click handler is an
+ * unhandled rejection and a console error, not something the menu can show.
+ *
+ * Revalidates the dashboard as well as the list, because this is the one row
+ * action that moves the stats: the watched count, the activity buckets and the
+ * up-next rail all read status. The backend decides what happens to the watch
+ * date, and `TitlesService.markWatched` is where that reasoning lives.
+ */
+export async function markWatched(titleId: string): Promise<boolean> {
+  try {
+    await apiFetch<TitleDetail>(`/api/titles/${titleId}/watched`, { method: 'POST' });
+  } catch {
+    return false;
+  }
+
+  revalidatePath('/');
+  revalidatePath('/library');
+  revalidatePath(`/titles/${titleId}`);
+
+  return true;
+}
+
+/**
  * Flips a title's favourite flag from the FAV column heart (LIB-6 · FIL-46).
  *
  * **Returns the stored state rather than nothing, and the caller needs it.** The

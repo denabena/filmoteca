@@ -9,6 +9,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 const noopToggle = jest.fn().mockResolvedValue({ favorite: false });
+/** The menu's own behaviour is `row-menu-actions.test.tsx`. */
+const noopMarkWatched = jest.fn().mockResolvedValue(true);
 
 function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
   return {
@@ -33,7 +35,12 @@ const LIBRARY = [
 
 function renderView(titles: TitleListItem[] = LIBRARY) {
   return render(
-    <LibraryView titles={titles} onToggleFavorite={noopToggle} genres={<p>Genre cards</p>} />,
+    <LibraryView
+      titles={titles}
+      onToggleFavorite={noopToggle}
+      onMarkWatched={noopMarkWatched}
+      genres={<p>Genre cards</p>}
+    />,
   );
 }
 

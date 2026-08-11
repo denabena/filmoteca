@@ -8,6 +8,7 @@ import { genreColorClass } from '@/lib/dashboard';
 import { STATUS_TONE, titleCaption, type TitleListItem } from '@/lib/library';
 import { FavoriteHeart, type ToggleFavorite } from './favorite-heart';
 import { RowMenu } from './row-menu';
+import { RowMenuActions, type MarkWatched } from './row-menu-actions';
 import { StarRating } from './star-rating';
 
 /**
@@ -37,6 +38,7 @@ import { StarRating } from './star-rating';
 export function TitleRow({
   title,
   onToggleFavorite,
+  onMarkWatched,
 }: {
   title: TitleListItem;
   /**
@@ -48,6 +50,8 @@ export function TitleRow({
    * this and keeps the row testable with a plain stub.
    */
   onToggleFavorite: ToggleFavorite;
+  /** The mark-as-watched Server Action, injected for the same reason. */
+  onMarkWatched: MarkWatched;
 }) {
   const status = STATUS_TONE[title.status];
   const router = useRouter();
@@ -126,7 +130,16 @@ export function TitleRow({
       </td>
 
       <td className="py-[14px] pr-[24px] pl-[16px]">
-        <RowMenu titleName={title.name} />
+        <RowMenu titleName={title.name}>
+          {(close) => (
+            <RowMenuActions
+              titleId={title.id}
+              titleName={title.name}
+              onMarkWatched={onMarkWatched}
+              onDone={close}
+            />
+          )}
+        </RowMenu>
       </td>
     </tr>
   );
