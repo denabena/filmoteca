@@ -45,16 +45,20 @@ export default function GoalStepPage() {
     };
   }, []);
 
+  function persistGoal() {
+    return fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monthlyWatchGoal: goal }),
+    });
+  }
+
   async function handleContinue() {
     setError(null);
     setSaving(true);
 
     try {
-      const response = await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ monthlyWatchGoal: goal }),
-      });
+      const response = await persistGoal();
 
       if (!response.ok) {
         setError('Could not save your goal. Please try again.');
@@ -67,6 +71,15 @@ export default function GoalStepPage() {
       setError('Something went wrong. Please try again.');
       setSaving(false);
     }
+  }
+
+  function handleBack() {
+    // Persist the current value before leaving so a goal changed here survives
+    // the Welcome round trip and is re-read on return (value-preservation AC).
+    // Back must always work, so this is fire-and-forget: a failed write just
+    // leaves the last persisted value, and navigation is never blocked on it.
+    void persistGoal().catch(() => {});
+    router.push('/welcome');
   }
 
   return (
@@ -95,7 +108,7 @@ export default function GoalStepPage() {
         <div className="flex w-full gap-3">
           <button
             type="button"
-            onClick={() => router.push('/welcome')}
+            onClick={handleBack}
             className="rounded-xl border border-border-strong bg-surface-card-raised px-5 py-[13px] text-[14px] font-semibold text-text-primary outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
           >
             Back

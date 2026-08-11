@@ -44,13 +44,20 @@ describe('GoalStepPage', () => {
     expect(JSON.parse(patch?.init?.body as string)).toEqual({ monthlyWatchGoal: 15 });
   });
 
-  it('sends Back to the Welcome screen without saving', async () => {
-    mockFetch(() => ({ ok: true, json: async () => ({ monthlyWatchGoal: 15 }) }));
+  it('persists the goal and returns to Welcome on Back', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    mockFetch((url, init) => {
+      calls.push({ url, init });
+      return { ok: true, json: async () => ({ monthlyWatchGoal: 15 }) };
+    });
 
     render(<GoalStepPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
 
+    // Navigation happens immediately; the save is fire-and-forget so the value
+    // entered here survives the Welcome round trip and is re-read on return.
     expect(mockPush).toHaveBeenCalledWith('/welcome');
+    await waitFor(() => expect(calls.some((c) => c.init?.method === 'PATCH')).toBe(true));
   });
 
   it('stays on the step and shows the failure when the save fails', async () => {
