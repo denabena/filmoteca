@@ -1,8 +1,11 @@
 import { toggleFavorite } from '@/app/(shell)/titles/actions';
+import { GenreCards } from '@/components/library/genre-cards';
 import { LibraryView } from '@/components/library/library-view';
+import { NewGenreButton } from '@/components/library/new-genre-button';
 import { AddTitleButton } from '@/components/shell/add-title-button';
 import { PageHeader } from '@/components/shell/page-header';
 import { apiFetch } from '@/lib/api';
+import type { GenreWithCount } from '@/lib/genres';
 import type { TitleListItem } from '@/lib/library';
 
 /**
@@ -18,10 +21,15 @@ import type { TitleListItem } from '@/lib/library';
  * structural rather than a promise: switching tabs cannot change a header that is
  * not inside the component doing the switching.
  *
- * The genre cards are still a placeholder; they are FIL-50.
+ * Both tabs' data is fetched together rather than on tab switch: the tabs are
+ * client state with no route behind them, so a fetch on switch would need a
+ * loading state the design does not draw, for two small lists.
  */
 export default async function LibraryPage() {
-  const titles = await apiFetch<TitleListItem[]>('/api/titles');
+  const [titles, genres] = await Promise.all([
+    apiFetch<TitleListItem[]>('/api/titles'),
+    apiFetch<GenreWithCount[]>('/api/genres/counts'),
+  ]);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -31,17 +39,10 @@ export default async function LibraryPage() {
         <LibraryView
           titles={titles}
           onToggleFavorite={toggleFavorite}
-          genres={<PanelPlaceholder>The genre cards land in FIL-50.</PanelPlaceholder>}
+          genres={<GenreCards genres={genres} />}
+          genresControls={<NewGenreButton />}
         />
       </div>
     </main>
-  );
-}
-
-function PanelPlaceholder({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="border-border-default text-text-secondary flex flex-1 items-center justify-center rounded-[18px] border border-dashed p-[40px] text-[14px]">
-      {children}
-    </div>
   );
 }
