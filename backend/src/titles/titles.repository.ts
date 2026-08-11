@@ -1,6 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, type Title } from '@prisma/client';
+import { Prisma, type Genre, type Title } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * A title with its genre row attached.
+ *
+ * The library table (FIL-45) draws a coloured dot beside a genre name, so a bare
+ * `genreId` is not enough and every row would otherwise need a second lookup.
+ */
+export type TitleWithGenre = Title & { genre: Genre };
 
 /**
  * What a caller may set when creating a title.
@@ -71,6 +79,26 @@ export class TitlesRepository {
     return this.prisma.title.findMany({
       ...args,
       where: { ...args.where, userId },
+    });
+  }
+
+  /**
+   * As findMany, but with each title's genre row attached (FIL-41).
+   *
+   * A separate method rather than an `include` passed through findMany, because
+   * only the include makes the return type honest: `findMany` is declared to
+   * return `Title[]` and an included relation would be present at runtime but
+   * invisible to the compiler, which is how a caller ends up reading
+   * `title.genre.name` off a type that never promised it.
+   */
+  findManyWithGenre(
+    userId: string,
+    args: Omit<ScopedFindManyArgs, 'include'> = {},
+  ): Promise<TitleWithGenre[]> {
+    return this.prisma.title.findMany({
+      ...args,
+      where: { ...args.where, userId },
+      include: { genre: true },
     });
   }
 
