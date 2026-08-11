@@ -10,6 +10,12 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 export type TitleWithGenre = Title & { genre: Genre };
 
+/** One genre's share of the owner's library, from `countByGenre` (FIL-43). */
+export interface GenreTitleCount {
+  genreId: string;
+  count: number;
+}
+
 /**
  * What a caller may set when creating a title.
  *
@@ -130,6 +136,30 @@ export class TitlesRepository {
     }
 
     return title;
+  }
+
+  /**
+   * How many of the owner's titles sit in each genre (FIL-43).
+   *
+   * One grouped query rather than twelve counts. Empty genres are absent from the
+   * result by construction, because `GROUP BY` can only return groups that have a
+   * row, which is exactly the "a genre with no titles does not appear" rule: the
+   * caller does not filter zeros out, they never arrive.
+   *
+   * Derived on every read and never stored, so nothing needs invalidating when a
+   * title is deleted or its genre changed.
+   */
+  async countByGenre(userId: string): Promise<GenreTitleCount[]> {
+    const groups = await this.prisma.title.groupBy({
+      by: ['genreId'],
+      where: { userId },
+      _count: { _all: true },
+    });
+
+    return groups.map((group) => ({
+      genreId: group.genreId,
+      count: group._count._all,
+    }));
   }
 
   /** Counts the owner's titles. Feeds the Picker unlock rule (FIL-67). */
