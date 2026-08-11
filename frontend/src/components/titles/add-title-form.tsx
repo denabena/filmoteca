@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { createTitle } from '@/app/(shell)/titles/actions';
 import { Icon } from '@/components/dashboard/icon';
@@ -14,7 +15,23 @@ import type { GenreOption } from '@/lib/dashboard';
  * A21 allows half stars, which is why the rating input steps in halves and is
  * sent as whole units of a half (0 to 10).
  */
-export function AddTitleForm({ genres }: { genres: GenreOption[] }) {
+export function AddTitleForm({
+  genres,
+  dismissable = false,
+}: {
+  genres: GenreOption[];
+  /**
+   * True when this form is inside the `@modal` intercepting route (FIL-28,
+   * FIL-44). Cancel then closes the modal via history instead of navigating to
+   * the dashboard, which is what "over the Library" requires: cancelling out of
+   * a modal opened from /library must put you back on /library, not on /.
+   *
+   * Defaults to false so the standalone /titles/new page keeps the exact
+   * behaviour it shipped with.
+   */
+  dismissable?: boolean;
+}) {
+  const router = useRouter();
   const [rating, setRating] = useState<number | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [errorFields, setErrorFields] = useState<string[]>([]);
@@ -54,9 +71,20 @@ export function AddTitleForm({ genres }: { genres: GenreOption[] }) {
         <h1 className="font-display text-[20px] leading-[1.22] font-bold tracking-[-0.1px]">
           Add title
         </h1>
-        <Link href="/" className="text-text-tertiary text-[13px]" aria-label="Cancel">
-          ✕
-        </Link>
+        {dismissable ? (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="text-text-tertiary text-[13px]"
+            aria-label="Cancel"
+          >
+            ✕
+          </button>
+        ) : (
+          <Link href="/" className="text-text-tertiary text-[13px]" aria-label="Cancel">
+            ✕
+          </Link>
+        )}
       </div>
 
       <Field label="Title" htmlFor="name">
@@ -159,12 +187,22 @@ export function AddTitleForm({ genres }: { genres: GenreOption[] }) {
       )}
 
       <div className="flex items-center justify-end gap-[10px]">
-        <Link
-          href="/"
-          className="bg-surface-card-raised border-border-strong text-text-primary rounded-[12px] border px-[20px] py-[13px] text-[14px] font-semibold"
-        >
-          Cancel
-        </Link>
+        {dismissable ? (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="bg-surface-card-raised border-border-strong text-text-primary rounded-[12px] border px-[20px] py-[13px] text-[14px] font-semibold"
+          >
+            Cancel
+          </button>
+        ) : (
+          <Link
+            href="/"
+            className="bg-surface-card-raised border-border-strong text-text-primary rounded-[12px] border px-[20px] py-[13px] text-[14px] font-semibold"
+          >
+            Cancel
+          </Link>
+        )}
         <button
           type="submit"
           disabled={isPending}
