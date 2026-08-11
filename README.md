@@ -254,6 +254,44 @@ npm run db:studio                  # browse the data in a GUI
 `npm install` runs `prisma generate` automatically via `postinstall`, so the Prisma Client
 is always present after an install. You never commit generated client code.
 
+### Importing the Picker catalogue
+
+The Scene Picker suggests titles you do not have yet, so it needs a pool to draw from. That
+pool is imported from [TMDB](https://www.themoviedb.org/) into the `catalogue_titles` table.
+It is **not** part of anyone's watchlist and has no owner.
+
+You need `TMDB_API_READ_TOKEN` in `backend/.env` first: register at themoviedb.org, then
+**Settings > API** and copy the **API Read Access Token** (the long v4 one, not the short v3
+API key).
+
+From `backend/`:
+
+```bash
+npm run catalogue:import          # 3 pages per genre per type, about 1,200 rows, ~100s
+npm run catalogue:import -- 1     # quicker, for a first look
+npm run catalogue:import -- 10    # a bigger pool
+```
+
+A page is 20 results. The script runs one query per genre, twelve against films and eight
+against series, and prints how many rows it imported, refreshed, skipped and could not map
+when it finishes.
+
+**Re-running it is safe and expected.** It upserts rather than inserts, so nothing
+duplicates, and TMDB's terms cap caching at six months, which makes a periodic re-run a
+licence requirement rather than an optimisation. The `synced_at` column is what makes
+staleness visible.
+
+Two things that surprise people:
+
+- **A title can appear under several genres**, so there are more rows than titles: a recent
+  run held 1,184 rows over 724 distinct titles. That is deliberate. The catalogue exists to
+  be queried by genre, and a film that is both Action and Sci-Fi should be findable under
+  either. It becomes single-genre only when someone adds it to their watchlist.
+- **Series cover only eight of the twelve genres.** TMDB's TV vocabulary has no Thriller,
+  Romance, Horror or Fantasy at all, so those four are films only. Nobody can tell the
+  difference between "no horror series in the pool" and "the picker chose three films this
+  time".
+
 ### What Prisma does and does not own
 
 Prisma manages the **`public`** schema only. Neon Auth owns the **`neon_auth`** schema
