@@ -1,18 +1,34 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import type { Profile } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { Prisma, type Profile } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NeonAuthUser } from '../auth/neon-auth.guard';
 
-/** Onboarding / Settings preferences that can be updated on a profile (FIL-23). */
+/**
+ * Fields that can be updated on a profile via `PATCH /api/profile`. Partial: only
+ * the keys present are written. Onboarding writes the goal/genres (FIL-23),
+ * Settings adds the identity fields (FIL-74).
+ */
 export interface ProfilePreferencesInput {
   monthlyWatchGoal?: number;
   favoriteGenres?: string[];
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  defaultType?: string;
+  newReleaseReminders?: boolean;
   avatarUrl?: string | null;
 }
 
 /** Monthly watch goal bounds: 1-99, step 1, default 15 (A4, a working decision). */
 export const MONTHLY_GOAL_MIN = 1;
 export const MONTHLY_GOAL_MAX = 99;
+
+/** Pragmatic email shape check: a single @ with non-empty, dot-bearing sides. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Cap on the stored avatar data URL (~256 KB). The frontend downsizes to a small
@@ -70,10 +86,11 @@ export class ProfileService {
    */
   async ensure(user: NeonAuthUser): Promise<Profile> {
     const { firstName, lastName } = splitName(user.name);
+    const email = user.email?.trim().toLowerCase() || null;
 
     return this.prisma.profile.upsert({
       where: { userId: user.id },
-      create: { userId: user.id, firstName, lastName },
+      create: { userId: user.id, firstName, lastName, email },
       update: {},
     });
   }
@@ -91,11 +108,7 @@ export class ProfileService {
     userId: string,
     input: ProfilePreferencesInput,
   ): Promise<Profile> {
-    const data: {
-      monthlyWatchGoal?: number;
-      favoriteGenres?: string[];
-      avatarUrl?: string | null;
-    } = {};
+    const data: Prisma.ProfileUpdateInput = {};
 
     if (input.monthlyWatchGoal !== undefined) {
       const goal = input.monthlyWatchGoal;
@@ -122,6 +135,51 @@ export class ProfileService {
       ];
     }
 
+    // Identity fields (FIL-74, A35). First/last name become separate stored
+    // values here for the first time. Editing email stores the profile email
+    // only; it does NOT change the Neon Auth sign-in credential (undesigned).
+    if (input.firstName !== undefined) {
+      const firstName = input.firstName.trim();
+      if (!firstName) {
+        throw new BadRequestException('First name is required.');
+      }
+      data.firstName = firstName;
+    }
+
+    if (input.lastName !== undefined) {
+      const lastName = input.lastName.trim();
+      if (!lastName) {
+        throw new BadRequestException('Last name is required.');
+      }
+      data.lastName = lastName;
+    }
+
+    if (input.email !== undefined) {
+      const email = input.email.trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email)) {
+        throw new BadRequestException('Enter a valid email.');
+      }
+      data.email = email;
+    }
+
+    // Watch preferences (FIL-75, SET-3/SET-4). The reminders flag is stored and
+    // nothing more: there is no notification system behind it (A28).
+    if (input.defaultType !== undefined) {
+      if (input.defaultType !== 'movie' && input.defaultType !== 'series') {
+        throw new BadRequestException(
+          'defaultType must be "movie" or "series".',
+        );
+      }
+      data.defaultType = input.defaultType;
+    }
+
+    if (input.newReleaseReminders !== undefined) {
+      if (typeof input.newReleaseReminders !== 'boolean') {
+        throw new BadRequestException('newReleaseReminders must be a boolean.');
+      }
+      data.newReleaseReminders = input.newReleaseReminders;
+    }
+
     // Profile photo (Settings "Change photo"). `null` clears it; a string must be
     // a small image data URL. Not in the design (A28); added on request.
     if (input.avatarUrl !== undefined) {
@@ -141,6 +199,17 @@ export class ProfileService {
       }
     }
 
-    return this.prisma.profile.update({ where: { userId }, data });
+    try {
+      return await this.prisma.profile.update({ where: { userId }, data });
+    } catch (error) {
+      // Unique violation on the email column: another account already has it.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('This email is already in use.');
+      }
+      throw error;
+    }
   }
 }

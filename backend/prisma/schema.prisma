@@ -29,12 +29,20 @@ enum TitleType {
   series
 }
 
+/// The STATUS chips in the library table (06) and the Status select on the Add
+/// title form (08). Lowercase to match TitleType and the tech spec's
+/// `enum: watched, watching, want to watch`.
+enum TitleStatus {
+  watched
+  watching
+  want_to_watch
+}
+
 /// Per-user settings and identity, from the tech spec's Profile entity.
 ///
-/// Deliberately the only model here. FIL-10 is the persistence foundation and
-/// nothing more, so Title, Genre and Pick belong to their own feature tickets.
-/// This one exists because every view needs a profile and because it establishes
-/// the ownership pattern FIL-14 enforces.
+/// `favoriteGenres` (FIL-23), `email` (FIL-74) and `avatarUrl` (Settings photo)
+/// are added by the profile preferences and Settings work, alongside the
+/// existing goal, default type and reminders.
 model Profile {
   id String @id @default(uuid()) @db.Uuid
 
@@ -46,6 +54,12 @@ model Profile {
 
   firstName String? @map("first_name")
   lastName  String? @map("last_name")
+
+  /// Contact email shown and edited in Settings (SET-6), seeded from the Neon
+  /// Auth token on first login. Unique so Settings can reject an email already
+  /// taken. NOTE: this is the app-level profile email; it does NOT re-point the
+  /// Neon Auth sign-in credential (changing that is undesigned, A-note on FIL-74).
+  email String? @unique @map("email")
 
   /// Profile photo as a small data URL (Settings "Change photo"). Not in the
   /// original design (A28 has no upload flow) - added on request. Stored inline
@@ -70,4 +84,255 @@ model Profile {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("profiles")
+}
+
+/// The twelve genres onboarding offers (GNR-2).
+///
+/// Reference data, not user data, so no owner column: A24 retires createGenre and
+/// editGenre, which fixes the set at twelve. The rows are seeded by the migration
+/// that creates this table rather than by a seed script, so any environment that
+/// has migrated has them, with no second manual step to forget on deploy.
+///
+/// A table rather than a Postgres enum for three reasons: listGenresWithCounts
+/// (FIL-43) has to return all twelve including the zeros, `colorSlot` and
+/// `descriptor` are per-genre data that would otherwise be stranded in code, and
+/// the TMDB mapping below has to be changeable without a schema migration.
+model Genre {
+  id   String @id @default(uuid()) @db.Uuid
+  slug String @unique
+  name String
+
+  /// One of the eight Foundations genre palette slots. Twelve genres over eight
+  /// slots, so slots repeat by design.
+  colorSlot Int @map("color_slot") @db.SmallInt
+
+  /// The card tagline on frame 12. Null until that copy is read out of the
+  /// design; nothing renders it yet, and inventing it here would look settled.
+  descriptor String?
+
+  /// TMDB's two genre vocabularies, held as data so re-mapping is an UPDATE
+  /// rather than a re-import of the whole catalogue. Movies cover all twelve. TV
+  /// has no Thriller, Romance, Horror or Fantasy at all, so those four carry a
+  /// null `tmdbTvId` and the Picker serves films for them. Sci-Fi's TV id is the
+  /// fused "Sci-Fi & Fantasy", which is why fantasy series land under Sci-Fi.
+  /// The full reasoning is in the `tmdb-catalogue` skill.
+  tmdbMovieId Int? @map("tmdb_movie_id")
+  tmdbTvId    Int? @map("tmdb_tv_id")
+
+  titles     Title[]
+  candidates CatalogueTitle[]
+  picks      Pick[]
+
+  @@map("genres")
+}
+
+/// One entry in a user's watchlist, from the tech spec's Title entity.
+///
+/// `progress` and `listChips` from that table are deliberately not columns. A9
+/// and A17 make both display-only with no form anywhere that can write them, and
+/// a column nothing can populate is worse than an absent one: it reads as
+/// supported.
+model Title {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The owner, taken from the verified JWT `sub`. Non-nullable, so a title
+  /// cannot exist unowned. A plain string rather than a foreign key for the same
+  /// reason as `Profile.userId`: `neon_auth."user"` lives in a schema Prisma does
+  /// not manage. Nothing outside TitlesRepository may query this table without
+  /// it.
+  userId String @map("user_id")
+
+  name    String
+  type    TitleType
+  status  TitleStatus
+  genreId String      @map("genre_id") @db.Uuid
+
+  /// Restrict, not Cascade: the twelve genres are fixed reference data, so a
+  /// delete that would orphan titles is a bug to surface, not to propagate.
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Restrict)
+
+  /// A20 ties neither watch date nor rating to status, so a want-to-watch title
+  /// may carry both and a watched title neither. Date rather than timestamp
+  /// because FIL-30 and FIL-32 bucket these by month and by week, and a
+  /// timezone-bearing value makes "watched in July" ambiguous.
+  watchDate DateTime? @map("watch_date") @db.Date
+
+  /// Half-star units, 0 to 10, so "4.5 / 5" stores as 9. A21 allows half stars
+  /// because that string appears on frames 06, 07 and 08. An integer rather than
+  /// a decimal keeps FIL-31's average exact and avoids Prisma's Decimal wrapper
+  /// leaking into JSON responses. Callers convert at the edge, not in the store.
+  rating Int? @db.SmallInt
+
+  note     String?
+  favorite Boolean @default(false)
+
+  /// Display-only, per A17 and DET-6: the title detail screen shows these but no
+  /// form anywhere captures them. They are copied from the Picker catalogue when
+  /// a suggestion is added to the watchlist, and stay null for a hand-typed
+  /// title. Copied rather than joined on purpose: the TMDB licence caps caching
+  /// at six months, so catalogue rows get re-imported, and a user's own row must
+  /// not change or break underneath them when that happens.
+  year       Int?
+  runtime    Int?
+  director   String?
+  posterPath String? @map("poster_path")
+
+  /// `createdAt` is the tech spec's `addedAt` ("Added Sep 28, 2024" on 07).
+  /// Server-set and never accepted from a caller, per FIL-54.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Every index leads with `user_id`, because every query against this table is
+  /// scoped to one owner. The three trailing columns are the orderings the
+  /// dashboard needs: status for the up-next rail, updatedAt for the
+  /// continue-watching hero, watchDate for the monthly and weekly aggregates.
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([userId, updatedAt])
+  @@index([userId, watchDate])
+  @@map("titles")
+}
+
+/// A Picker candidate imported from TMDB (FIL-81).
+///
+/// **Deliberately has no owner.** Every other table is scoped to a user after
+/// FIL-14; this one is shared reference data and must not be, or the same
+/// candidate could not be suggested to two people. Do not add a user column.
+///
+/// **Treat it as read-only from the app.** Nothing in the designed UI edits a
+/// catalogue entry. "Add to watchlist" (PIC-7) *copies* a candidate into the
+/// user's own `titles` rather than moving or mutating the row here, which is why
+/// `Title` carries its own `year`, `runtime` and `posterPath`.
+model CatalogueTitle {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// TMDB keeps movies and series in **separate id spaces**, so `tmdbId` alone is
+  /// not a key: film 1399 and series 1399 are unrelated.
+  tmdbId Int       @map("tmdb_id")
+  type   TitleType
+
+  name String
+
+  /// Nullable because TMDB's release date is frequently an empty string, and a
+  /// candidate with no year is still perfectly suggestable.
+  year Int?
+
+  /// Minutes. Nullable and often absent. For a series this is TMDB's
+  /// `episode_run_time`, which is **per episode**, so a sitcom reads 25 where a
+  /// film reads 166. A null runtime is imported but excluded from the "Short &
+  /// sweet" mood chip rather than skipped.
+  runtime Int?
+
+  genreId String @map("genre_id") @db.Uuid
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Restrict)
+
+  /// TMDB's own genre ids for this title, kept raw alongside the mapped genre.
+  /// Without them, changing the mapping means re-importing thousands of rows;
+  /// with them it is one UPDATE. The Sci-Fi/Fantasy fold will get revisited.
+  tmdbGenreIds Int[] @map("tmdb_genre_ids")
+
+  overview   String?
+  posterPath String? @map("poster_path")
+
+  /// Filtering only, never displayed. Omitting `voteCount` is how a picker ends
+  /// up suggesting a film with a single 10/10 vote.
+  voteAverage Float @map("vote_average")
+  voteCount   Int   @map("vote_count")
+
+  /// When this row was last refreshed from TMDB. Their terms cap caching at six
+  /// months, so re-import cadence is a licence requirement rather than an
+  /// optimisation, and this column is what makes staleness visible.
+  syncedAt DateTime @updatedAt @map("synced_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// **One row per title per genre**, not one row per title.
+  ///
+  /// TMDB tags a film with several genres and the import runs one query per
+  /// genre, so a title genuinely matches more than one. Keying on `(type, tmdbId)`
+  /// alone made the last genre queried overwrite every earlier one, and since
+  /// genres are iterated alphabetically that starved the early ones: a real run
+  /// left Action with **one** movie out of 724 rows, because almost every action
+  /// film was later re-claimed by Crime, Drama, Sci-Fi or Thriller.
+  ///
+  /// A19 constrains the *user's* Title to a single genre. It says nothing about a
+  /// candidate pool that exists to be queried by genre, so a film that is both
+  /// Action and Sci-Fi should be findable under either. It becomes single-genre at
+  /// the moment PIC-7 copies it into someone's watchlist.
+  picks Pick[]
+
+  @@unique([type, tmdbId, genreId])
+  @@index([genreId, type])
+  @@map("catalogue_titles")
+}
+
+/// Where a suggestion stands, from the tech spec's Pick entity.
+enum PickState {
+  suggested
+  added
+  dismissed
+}
+
+/// One suggestion made to one user (FIL-65, FIL-66).
+///
+/// Per-user, unlike CatalogueTitle: the same candidate is suggestable to
+/// everybody, but a suggestion belongs to whoever it was made to.
+///
+/// The card fields are **copied from the candidate**, not joined, for the same
+/// reason `Title` copies them: TMDB's terms cap caching at six months, so
+/// catalogue rows get re-imported, and a suggestion already shown to someone must
+/// not change underneath them.
+model Pick {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id")
+
+  /// Which generation produced this. The three picks of one run share a batch, so
+  /// "the current picks" is a query rather than a deletion: regenerating adds a
+  /// batch instead of destroying the old one, which is what keeps a failed
+  /// generation from emptying the dashboard teaser.
+  batchId String @map("batch_id") @db.Uuid
+
+  /// 0, 1, 2 within the batch. Rank 0 is the top pick, which is the one the
+  /// dashboard teaser reads.
+  rank Int @db.SmallInt
+
+  /// Kept so a dismissal can exclude this candidate from every future run. The
+  /// relation is Restrict: a candidate that somebody has been shown must not
+  /// vanish from under their pick.
+  catalogueTitleId String         @map("catalogue_title_id") @db.Uuid
+  catalogueTitle   CatalogueTitle @relation(fields: [catalogueTitleId], references: [id], onDelete: Restrict)
+
+  name    String
+  year    Int?
+  type    TitleType
+  runtime Int?
+
+  genreId String @map("genre_id") @db.Uuid
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Restrict)
+
+  posterPath String? @map("poster_path")
+
+  /// "96% match" on the pick card. See PickScorer for how it is computed; the
+  /// design does not say, and the number invites the question.
+  matchPercent Int @map("match_percent")
+
+  /// The reason line. Required to reference something real about this user's
+  /// library, which is why it is stored rather than recomputed: the sentence has
+  /// to stay true to the moment it was written.
+  reason String
+
+  /// The mood chips selected for this run, empty when none were.
+  moods String[]
+
+  state PickState @default(suggested)
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  /// A candidate is offered to a user at most once, which is what makes a
+  /// dismissal permanent without a second table.
+  @@unique([userId, catalogueTitleId])
+  @@index([userId, batchId])
+  @@index([userId, state])
+  @@map("picks")
 }

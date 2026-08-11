@@ -34,6 +34,8 @@ backend/          NestJS 11 API, port 3000, its own package.json + node_modules
   prisma.config.ts  Prisma 7 CLI config. Excluded from tsconfig.build.json
   src/prisma/     PrismaService, global
   src/auth/       NeonAuthGuard, @CurrentUser, GET /api/me
+  src/profile/    ProfileService, created on first authenticated request
+  src/titles/     TitlesRepository, the only code allowed to query `titles`
 frontend/         Next.js 16 + React 19, port 4200, its own package.json + node_modules
   src/lib/auth/   Neon Auth server and client instances
   src/app/api/auth/[...path]/  Proxies auth calls to Neon, server-side
@@ -146,6 +148,18 @@ page did: no CORS is involved and there is no client-side loading state. CORS is
 the backend anyway (`main.ts`) for genuinely client-side fetches, allowing origin
 `FRONTEND_URL`.
 
+**The frontend calls the backend through `src/lib/api.ts`, never `fetch` directly.**
+`apiFetch` reads the Neon Auth session, mints a short-lived JWT and sends it as a bearer
+token, which is the chain `/me` proved end to end. It imports `server-only`, so pulling it
+into a Client Component fails at build time rather than shipping a token minter to the
+browser.
+
+**Design tokens live in `frontend/src/app/globals.css` and only confirmed values go in.**
+Everything there was read out of Figma, including the eight-slot genre palette and the
+status tones. `Genre.colorSlot` in the backend indexes into `--color-genre-1..7`; slot 8 is
+undeclared because no built screen uses it. Add a token in the ticket that needs it rather
+than guessing a value.
+
 **Configuration goes through ConfigService.** `ConfigModule.forRoot({ isGlobal: true })`
 is registered in `backend/src/app.module.ts`, so it reads `backend/.env` at startup and
 `ConfigService` is injectable everywhere without re-importing the module. Read values
@@ -175,6 +189,104 @@ and the verified JWT already carries the caller's identity, so no join is needed
 who is asking. Note the table is `neon_auth."user"`, **not** `users_sync`; that name
 belongs to the older Stack Auth integration and does not exist here.
 
+**Every title query goes through `TitlesRepository`, and that is a rule, not a
+preference.** `backend/src/titles/titles.repository.ts` is the only file permitted to touch
+`prisma.title`. Each method takes the owner as its first argument and merges `userId` into
+the query itself, so a feature module cannot express an unscoped title query without going
+around the file. Inject `TitlesRepository`, never `PrismaService`, when you need titles.
+
+Two details in there are load-bearing. `userId` is spread **after** the caller's `where`
+(`{ ...args.where, userId }`), so `where: { userId: someoneElse }` cannot override the
+owner; reverse the spread and one test fails, which is the point of that test. And a row
+owned by someone else is reported as **404, not 403**, because a 403 confirms the row exists
+and so leaks another account's data by omission.
+
+**The dashboard is one route, not one per section.** `GET /api/dashboard?month=YYYY-MM`
+returns a `DashboardSummary`, following the tech spec's single `getDashboardSummary`
+operation. Frame 04 renders every section at once, so splitting it would buy the frontend
+four round trips it has no use for. Every section of the spec's operation is present now:
+`continueWatching`, `upNext`, `stats` and `picker`.
+
+`month` is optional and defaults to the current month. It scopes the **stats only**: per A11
+and A9 the up-next rail and the continue-watching hero are not month-scoped. The response also
+carries `availableMonths` (months the user actually watched something in, plus the current
+one) and `topPick` (rank 0 of the newest batch, the same card the Picker page lists first).
+
+**The dashboard's month lives in client state, not the URL, and that is deliberate.** FIL-40
+requires a reload to reset to the current month, which `?month=` cannot do: a URL survives a
+refresh by definition. `DashboardView` owns the selection and refetches through a Server
+Action. The cost is a view that is not shareable and a back button that does not step through
+months. Reversing it is one line if the designer prefers the URL.
+
+**A title's month is its `watchDate`, so a watched title with no date counts nowhere.** That
+is deliberate and is FIL-30's acceptance criterion. Three more rules in
+`backend/src/dashboard/` that are decisions rather than readings of the design, each flagged
+for the designer: the activity chart always draws four bars, so a month is cut as days 1-7,
+8-14, 15-21 and **22 to the end**, which makes the last bar one to three days longer; a tie
+for top genre breaks alphabetically; and `averageRating` is `null` rather than `0` when
+nothing is rated, because the card's empty state is "- / 5" and has to stay distinguishable
+from a real average of zero.
+
+Note that `stats.activity.total` and `stats.watched.count` are derived from the same row set
+and are therefore always equal. A29 records that the mock contradicts itself here, showing 14
+on the badge and 12 on the card for the same month; computing both from one query is what
+stops that being reproduced.
+
+**The Picker unlock rule lives in exactly one service.** `PickerGateService` decides it, the
+Picker page reads it at `GET /api/picker/gate`, and the dashboard embeds the same value under
+`picker`. Two routes, one source, which is what stops the teaser and the Picker page showing a
+user a locked card on one screen and an unlocked one on the other. The rule is **three rated
+titles**, and both halves of that are decisions: A27 leaves the number undecided, and the two
+copy strings disagree (frame 16 says "titles", frame 05 says "added and rated"), so the
+stricter reading wins and merely adding titles never unlocks anything. It is derived on every
+read rather than stored, so deleting or un-rating a title re-locks without an invalidation
+hook on any mutation path.
+
+**Dismissing a pick excludes the TMDB title, not the catalogue row.** These two facts fight
+each other and the collision is easy to reintroduce: `catalogue_titles` holds one row per
+title per genre, so excluding the single row a user dismissed left the same film eligible
+under its other genres. Dismissing a film as Drama and being offered it again as Sci-Fi is
+exactly what "Not for me" exists to prevent. `CandidatesRepository` therefore excludes on
+`(type, tmdbId)`, and `PicksService` de-duplicates the pool on the same pair so one batch
+never shows the same film twice. There is a test for each.
+
+Two more Picker decisions that are working assumptions, both flagged in code for the
+designer: **dismissal is permanent** (the design never says whether "Not for me" means "not
+tonight" or "never", and those are different products), and the **match percentage** is
+0.45 genre affinity + 0.30 mood fit + 0.25 TMDB acclaim, scaled into 60-99. Nothing designs
+that number, and "96% match" invites the question. Genre affinity is read from **rated
+titles**, not from `Profile.favoriteGenres`, which is FIL-23 and does not exist yet.
+
+**The catalogue is not the watchlist.** `Title` rows are per-user watchlist entries. The
+TMDB catalogue is a global candidate pool for the Picker, and TMDB's terms cap caching at
+six months, so it gets re-imported. That is why `year`, `runtime`, `director` and
+`posterPath` are **copied onto `Title`** rather than joined from a catalogue row: a user's
+own entry must not change or break when the catalogue refreshes. Those four are null for a
+hand-typed title, because per A17 no form anywhere captures them.
+
+**The catalogue holds one row per title per genre, and that is not an accident.** Keying
+`catalogue_titles` on `(type, tmdbId)` alone looks obviously right and is wrong: the import
+runs one `/discover` query per genre, so the last genre queried overwrote every earlier one,
+and since genres are iterated alphabetically that starved the early ones. A real 724-row run
+left **Action holding a single movie**. The key is `(type, tmdbId, genreId)`, so each genre
+query keeps what it found. A19 constrains the *user's* `Title` to one genre; it says nothing
+about a candidate pool whose entire purpose is being queried by genre.
+
+Two more things about that table: it has **no owner column** and must never get one, because
+the same candidate has to be suggestable to everybody; and it is **read-only from the app**,
+because PIC-7 *copies* a candidate into someone's `titles` rather than moving it.
+
+Run it with `npm run catalogue:import` from `backend/`, optionally with a page count
+(`-- 10`). Re-running is safe and required: TMDB caps caching at six months.
+
+**The twelve genres are seeded by the migration, not a seed script.** A24 retires
+createGenre and editGenre, so the set is fixed reference data. Putting the rows in
+`20260809175645_add_title_genre_and_ownership/migration.sql` means any environment that has
+migrated has them, with no second manual step next to the migrate that already has to be run
+by hand on deploy. `Genre` also carries `tmdbMovieId` and `tmdbTvId`, which holds the two
+TMDB vocabularies as data: Thriller, Romance, Horror and Fantasy have a null `tmdbTvId`
+because TV has no equivalent, and re-mapping is then an UPDATE rather than a re-import.
+
 **Auth lives in the frontend, and the backend only verifies.** Next.js owns the sign-in UI
 and the session cookie. Because the API is a separate origin it never receives that cookie,
 so the frontend mints a short-lived JWT at `/api/auth/token` and sends it as a bearer
@@ -199,13 +311,35 @@ no longer allowed in `schema.prisma` and live in `prisma.config.ts`, which must 
 ESM relying on `import.meta.url`, which cannot compile to CommonJS and so breaks every Jest
 suite. And `prisma.config.ts` is excluded in `tsconfig.build.json`: it sits at the package
 root, so including it makes tsc infer that root as the common root and emit
-`dist/src/main.js` instead of `dist/main.js`, silently breaking `start:prod`.
+`dist/src/main.js` instead of `dist/main.js`, silently breaking `start:prod`. `rootDir` is
+now pinned to `./src` as well, so that mistake fails loudly at build time instead.
 
-**Jest transforms `jose`.** It ships ESM only, so both jest configs carry
-`transformIgnorePatterns` that exempt it plus an inline `module: commonjs` tsconfig. The
-e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets it run
+**A stale `tsconfig.build.tsbuildinfo` will hand you a half-empty `dist` and exit 0.** That
+file is the incremental-build cache, gitignored, and it lives at the package root rather than
+inside `dist/`. So deleting `dist/` does not invalidate it: the next `npm run build` decides
+most files are unchanged, emits only the ones you touched, and reports success. You get a
+`dist/` containing your new module and nothing else, and the failure surfaces later as
+`Cannot find module '../prisma/prisma.service'`. When `dist/` looks wrong, delete both:
+`rm -rf dist *.tsbuildinfo && npm run build`.
+
+**`jose` ships ESM only, and that breaks two different things.** For Jest, both jest configs
+carry `transformIgnorePatterns` exempting it plus an inline `module: commonjs` tsconfig. For
+production, `NeonAuthGuard` must load it with `await import('jose')` rather than a static
+import: this backend compiles to CommonJS, a static import becomes `require()`, and Vercel's
+Node loader cannot `require()` an ES module, so every request died with `ERR_REQUIRE_ESM`.
+**It works locally only because Node 24 supports `require(esm)` and the deployed loader does
+not**, which makes this invisible until deploy. Keep the `jose` import type-only and dynamic;
+verify with `grep "import('jose')" backend/dist/auth/neon-auth.guard.js` after building.
+
+The e2e suite also overrides `PrismaService` and `NeonAuthGuard`, which is what lets it run
 with no `backend/.env` at all. Verify that by moving `.env` aside and re-running, because
 CI has no `.env`.
+
+**A pattern worth internalising from all of this: local success proves very little about
+deployment here.** Three separate bugs shipped green locally and failed only in CI or on
+Vercel: eager config reads (fine with a real `.env`, fatal without), the missing services
+`entrypoint` (fine standalone, fatal in services mode), and this ESM require (fine on Node
+24, fatal on the deployed loader). Test the actual failing condition, not the happy one.
 
 **Deployment is one Vercel project, two services, one domain.** `vercel.json` uses
 [Vercel Services](https://vercel.com/docs/services). Two decisions in it are non-obvious and

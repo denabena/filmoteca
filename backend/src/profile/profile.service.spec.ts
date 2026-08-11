@@ -1,6 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { Profile } from '@prisma/client';
+import { Prisma, type Profile } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NeonAuthUser } from '../auth/neon-auth.guard';
 import { ProfileService, splitName } from './profile.service';
@@ -35,6 +35,7 @@ describe('ProfileService', () => {
     userId: 'neon-user-123',
     firstName: 'Ana',
     lastName: 'Skukan',
+    email: 'ana@example.com',
     monthlyWatchGoal: 15,
     defaultType: 'movie',
     newReleaseReminders: false,
@@ -68,6 +69,7 @@ describe('ProfileService', () => {
           userId: 'neon-user-123',
           firstName: 'Ana',
           lastName: 'Skukan',
+          email: 'ana@example.com',
         },
         update: {},
       });
@@ -127,6 +129,64 @@ describe('ProfileService', () => {
       expect(update).not.toHaveBeenCalled();
     });
 
+    it('rejects a blank first or last name per field', async () => {
+      await expect(
+        service.updatePreferences('neon-user-123', { firstName: '  ' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.updatePreferences('neon-user-123', { lastName: '' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed email', async () => {
+      await expect(
+        service.updatePreferences('neon-user-123', { email: 'not-an-email' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('stores a normalised name and email', async () => {
+      await service.updatePreferences('neon-user-123', {
+        firstName: 'Ana',
+        lastName: 'Skukan',
+        email: '  Ana@Example.com ',
+      });
+
+      expect(update).toHaveBeenCalledWith({
+        where: { userId: 'neon-user-123' },
+        data: {
+          firstName: 'Ana',
+          lastName: 'Skukan',
+          email: 'ana@example.com',
+        },
+      });
+    });
+
+    it('maps a duplicate-email unique violation to a conflict', async () => {
+      update.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(
+        service.updatePreferences('neon-user-123', {
+          email: 'taken@example.com',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects a default type other than movie or series', async () => {
+      await expect(
+        service.updatePreferences('neon-user-123', {
+          defaultType: 'documentary',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
     it('rejects an oversized avatar', async () => {
       const huge = 'data:image/png;base64,' + 'A'.repeat(300_000);
       await expect(
@@ -148,6 +208,31 @@ describe('ProfileService', () => {
       expect(update).toHaveBeenLastCalledWith({
         where: { userId: 'neon-user-123' },
         data: { avatarUrl: null },
+      });
+    });
+
+    it.each([true, false])(
+      'persists the reminders toggle (%p)',
+      async (flag) => {
+        await service.updatePreferences('neon-user-123', {
+          newReleaseReminders: flag,
+        });
+
+        expect(update).toHaveBeenCalledWith({
+          where: { userId: 'neon-user-123' },
+          data: { newReleaseReminders: flag },
+        });
+      },
+    );
+
+    it('stores a valid default type', async () => {
+      await service.updatePreferences('neon-user-123', {
+        defaultType: 'series',
+      });
+
+      expect(update).toHaveBeenCalledWith({
+        where: { userId: 'neon-user-123' },
+        data: { defaultType: 'series' },
       });
     });
   });
