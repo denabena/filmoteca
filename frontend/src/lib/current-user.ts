@@ -11,6 +11,13 @@ export interface Profile {
   firstName: string;
   lastName: string;
   email: string;
+  /**
+   * The uploaded profile photo as a data URL, or null/undefined when the user
+   * has none. Optional so the many places that build a Profile from a name alone
+   * (the session, tests) need not carry it; the sidebar falls back to initials
+   * whenever it is absent.
+   */
+  avatarUrl?: string | null;
 }
 
 /**
@@ -46,9 +53,8 @@ export function shortName({ firstName, lastName }: Profile): string {
 }
 
 /**
- * Avatar initials: "MK". Derived from the name rather than stored, because
- * "Change photo" has no designed upload flow (A28), so initials are the only
- * avatar the app can ever show.
+ * Avatar initials: "MK". The fallback the sidebar shows when the user has no
+ * uploaded photo (`Profile.avatarUrl`); derived from the name rather than stored.
  */
 export function avatarInitials({ firstName, lastName }: Profile): string {
   return `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`.toUpperCase();

@@ -103,6 +103,45 @@ describe('Sidebar', () => {
     expect(screen.getByText('MK')).toBeInTheDocument();
   });
 
+  it('shows the uploaded photo instead of initials when the profile has one', () => {
+    const avatar = 'data:image/jpeg;base64,abc';
+    // The photo is decorative (aria-hidden, empty alt), so it is out of the a11y
+    // tree; query the element directly rather than by role.
+    const { container } = renderSidebar('/', { ...PROFILE, avatarUrl: avatar });
+
+    expect(container.querySelector('img')).toHaveAttribute('src', avatar);
+    expect(screen.queryByText('MK')).not.toBeInTheDocument();
+  });
+
+  it('swaps initials for the photo when a profile change adds one, with no reload', async () => {
+    const avatar = 'data:image/jpeg;base64,xyz';
+
+    function AddPhotoButton() {
+      const { setProfile } = useProfile();
+
+      return (
+        <button type="button" onClick={() => setProfile({ ...PROFILE, avatarUrl: avatar })}>
+          Add photo
+        </button>
+      );
+    }
+
+    mockUsePathname.mockReturnValue('/');
+    const { container } = render(
+      <ProfileProvider initialProfile={PROFILE}>
+        <Sidebar />
+        <AddPhotoButton />
+      </ProfileProvider>,
+    );
+
+    expect(screen.getByText('MK')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add photo' }));
+
+    expect(container.querySelector('img')).toHaveAttribute('src', avatar);
+    expect(screen.queryByText('MK')).not.toBeInTheDocument();
+  });
+
   it('updates the footer name and initials when the profile changes, with no reload', async () => {
     // Stands in for Settings "Save changes" (FIL-79), which is the real caller.
     function RenameButton() {

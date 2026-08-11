@@ -155,8 +155,14 @@ export default function SettingsPage() {
       }
 
       // Propagate the identity change to the sidebar (SET-6); no per-screen copy
-      // of the profile.
-      setProfile({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim() });
+      // of the profile. Includes the avatar so a new or removed photo shows in
+      // the footer immediately, without waiting for a reload.
+      setProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        avatarUrl: avatarUrl || null,
+      });
       setSaved(true);
       setSaving(false);
       router.refresh();
