@@ -2,6 +2,14 @@ import { render, screen, within } from '@testing-library/react';
 import { starFills, titleCaption, type TitleListItem } from '@/lib/library';
 import { TitlesTable } from './titles-table';
 
+// A row navigates on click (FIL-47), so it reads the router. What that
+// navigation does is covered in `row-entry-points.test.tsx`; here it only has to
+// exist, since jsdom provides no App Router context.
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+  usePathname: () => '/library',
+}));
+
 /** A row with everything populated; each test overrides the field it is about. */
 function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
   return {
