@@ -6,8 +6,26 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+// `jose` ships ESM only, so it is imported for TYPES here and loaded with a
+// dynamic import() at runtime (see getVerifier). A static import compiles to
+// require() in this CommonJS build, and Vercel's Node loader cannot require() an
+// ES module: every request died with ERR_REQUIRE_ESM. It worked locally purely
+// because Node 24 supports require(esm) and the deployed loader does not.
+import type { JWTPayload } from 'jose';
 import type { Request } from 'express';
+
+/** The parts of `jose` this guard uses, resolved once per process. */
+type JoseVerifier = {
+  jwks: ReturnType<typeof import('jose').createRemoteJWKSet>;
+  jwtVerify: typeof import('jose').jwtVerify;
+  /**
+   * Neon Auth issues tokens with `iss` and `aud` both set to the origin of the
+   * auth instance, without the `/neondb/auth` path. Deriving it from the JWKS
+   * URL keeps this to one environment variable rather than three that could
+   * drift out of sync.
+   */
+  issuer: string;
+};
 
 /**
  * The subset of the Neon Auth token we rely on. `sub` is the user id and is the
@@ -50,20 +68,11 @@ export class NeonAuthGuard implements CanActivate {
    * createRemoteJWKSet caches the key set and refetches on rotation, so this is
    * built once per process rather than per request.
    */
-  private verifier?: {
-    jwks: ReturnType<typeof createRemoteJWKSet>;
-    /**
-     * Neon Auth issues tokens with `iss` and `aud` both set to the origin of the
-     * auth instance, without the `/neondb/auth` path. Deriving it from the JWKS
-     * URL keeps this to one environment variable rather than three that could
-     * drift out of sync.
-     */
-    issuer: string;
-  };
+  private verifier?: JoseVerifier;
 
   constructor(private readonly config: ConfigService) {}
 
-  private getVerifier(): NonNullable<NeonAuthGuard['verifier']> {
+  private async getVerifier(): Promise<JoseVerifier> {
     if (this.verifier) return this.verifier;
 
     const jwksUrl = this.config.get<string>('NEON_AUTH_JWKS_URL');
@@ -75,8 +84,13 @@ export class NeonAuthGuard implements CanActivate {
       );
     }
 
+    // Dynamic, so it survives being emitted as CommonJS. See the import note
+    // at the top of this file.
+    const { createRemoteJWKSet, jwtVerify } = await import('jose');
+
     this.verifier = {
       jwks: createRemoteJWKSet(new URL(jwksUrl)),
+      jwtVerify,
       issuer: new URL(jwksUrl).origin,
     };
 
@@ -91,7 +105,7 @@ export class NeonAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing bearer token');
     }
 
-    const { jwks, issuer } = this.getVerifier();
+    const { jwks, jwtVerify, issuer } = await this.getVerifier();
 
     try {
       // jose checks exp and nbf as part of verification, so an expired token
