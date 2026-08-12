@@ -39,6 +39,17 @@ export function GenreCards({ genres }: { genres: GenreWithCount[] }) {
   );
 }
 
+/**
+ * One genre card.
+ *
+ * **Nothing on it is clickable, and that is deliberate (GEN-5 · A24, FIL-51).**
+ * The card has no designed destination: there is no per-genre screen anywhere in
+ * the file, so a click target here would promise a page that does not exist.
+ * Note what is *absent* as a result: no `onClick`, no `cursor-pointer`, no hover
+ * treatment. A card that lights up under the pointer and then does nothing is
+ * the specific failure this ticket is guarding against, so the plain surface is
+ * the feature.
+ */
 function GenreCard({ genre }: { genre: GenreWithCount }) {
   const descriptor = genreDescriptor(genre);
 
@@ -64,7 +75,21 @@ function GenreCard({ genre }: { genre: GenreWithCount }) {
           </p>
         </div>
 
-        {/* Inert by design (A24). FIL-51 settles how it announces itself. */}
+        {/*
+          Drawn but inert (GEN-5 · A24, FIL-51). The card kebab has no designed
+          menu anywhere in the file, so there is nothing behind it.
+
+          A `<span>`, not a disabled `<button>`, and the difference matters. A
+          disabled button is still an announced control that happens to be
+          unavailable; this is not a control at all, which is the truthful
+          description of a mark with no behaviour designed for it. It is
+          `aria-hidden`, so a screen reader passes over it rather than offering
+          the user something they cannot complete, and it is not in the tab
+          order.
+
+          The mark still ships because the design draws it. **Removing it until a
+          menu exists is the honest alternative and is a designer's call.**
+        */}
         <span
           className="text-text-tertiary flex shrink-0 flex-col items-center gap-[3px] pt-[6px]"
           aria-hidden="true"
