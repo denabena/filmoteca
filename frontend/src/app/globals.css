@@ -42,7 +42,7 @@
   --color-border-strong: #353d48;
 
   --color-accent: #f0455f;
-  /* Selected mood chip and match badge backgrounds. */
+  /* Selected mood chip, match badge and genre-chip fill (FIL-26). */
   --color-accent-soft: #33212a;
 
   /*

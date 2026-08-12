@@ -40,9 +40,8 @@ enum TitleStatus {
 
 /// Per-user settings and identity, from the tech spec's Profile entity.
 ///
-/// `favoriteGenres` from the tech spec is deliberately absent: it is FIL-23's to
-/// add, and that ticket is in progress elsewhere. Pick is likewise still to come,
-/// with FIL-65 and FIL-66.
+/// `favoriteGenres` is the onboarding genre selection (FIL-23), added by the
+/// migration alongside the existing goal, default type and reminder fields.
 model Profile {
   id String @id @default(uuid()) @db.Uuid
 
@@ -62,6 +61,11 @@ model Profile {
   defaultType TitleType @default(movie) @map("default_type")
 
   newReleaseReminders Boolean @default(false) @map("new_release_reminders")
+
+  /// Favorite genres picked in onboarding (GNR-4) and editable in Settings. The
+  /// 12 chips from frame 03 (A7), stored as their identifiers. Any number is
+  /// allowed, including none (A6), so it defaults to empty rather than null.
+  favoriteGenres String[] @default([]) @map("favorite_genres")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
