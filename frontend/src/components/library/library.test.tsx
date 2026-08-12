@@ -17,6 +17,12 @@ jest.mock('next/navigation', () => ({
 const mockApiFetch = jest.fn();
 jest.mock('../../lib/api', () => ({ apiFetch: (path: string) => mockApiFetch(path) }));
 
+// The page imports the favourite Server Action to hand down to the table. That
+// module pulls `next/cache` and the Next server runtime, which jsdom cannot load,
+// so it is stubbed here. What the action does is covered in
+// `favorite-heart.test.tsx`; the page only has to pass it along.
+jest.mock('../../app/(shell)/titles/actions', () => ({ toggleFavorite: jest.fn() }));
+
 function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
   return {
     id: 'title-1',

@@ -59,3 +59,34 @@ export async function createTitle(input: CreateTitleInput): Promise<CreateTitleF
   // a successful save into a form error.
   redirect(`/titles/${created.id}`);
 }
+
+/**
+ * Flips a title's favourite flag from the FAV column heart (LIB-6 · FIL-46).
+ *
+ * **Returns the stored state rather than nothing, and the caller needs it.** The
+ * heart updates optimistically, so the only way it can tell a successful save
+ * from a failed one is the server's answer. It returns `null` on failure rather
+ * than throwing, because a thrown Server Action reaching a click handler in
+ * production is an unhandled rejection and a console error, not a revert.
+ *
+ * The paths revalidated are the ones that draw this flag: the library list and
+ * the title's own detail screen, which is the last of FIL-46's criteria. The
+ * dashboard is deliberately not among them, because nothing on it reads
+ * `favorite`.
+ */
+export async function toggleFavorite(titleId: string): Promise<{ favorite: boolean } | null> {
+  let updated: TitleDetail;
+
+  try {
+    updated = await apiFetch<TitleDetail>(`/api/titles/${titleId}/favorite`, {
+      method: 'POST',
+    });
+  } catch {
+    return null;
+  }
+
+  revalidatePath('/library');
+  revalidatePath(`/titles/${titleId}`);
+
+  return { favorite: updated.favorite };
+}

@@ -1,4 +1,5 @@
 import type { TitleListItem } from '@/lib/library';
+import type { ToggleFavorite } from './favorite-heart';
 import { TitleRow } from './title-row';
 
 /**
@@ -16,7 +17,14 @@ import { TitleRow } from './title-row';
  * raising if libraries are expected to grow past a few hundred rows, because at
  * that point this wants virtualising rather than a taller scroll area.
  */
-export function TitlesTable({ titles }: { titles: TitleListItem[] }) {
+export function TitlesTable({
+  titles,
+  onToggleFavorite,
+}: {
+  titles: TitleListItem[];
+  /** Forwarded to each row's heart. See `TitleRow` for why it is injected. */
+  onToggleFavorite: ToggleFavorite;
+}) {
   return (
     <div className="bg-surface-card border-border-default max-h-[calc(100vh-260px)] overflow-y-auto rounded-[18px] border">
       <table className="w-full border-separate border-spacing-0 text-left">
@@ -50,7 +58,7 @@ export function TitlesTable({ titles }: { titles: TitleListItem[] }) {
         </thead>
         <tbody>
           {titles.map((title) => (
-            <TitleRow key={title.id} title={title} />
+            <TitleRow key={title.id} title={title} onToggleFavorite={onToggleFavorite} />
           ))}
         </tbody>
       </table>

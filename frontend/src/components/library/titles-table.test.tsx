@@ -10,6 +10,9 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/library',
 }));
 
+/** The heart's own behaviour is `favorite-heart.test.tsx`; here it just needs one. */
+const noopToggle = jest.fn().mockResolvedValue({ favorite: false });
+
 /** A row with everything populated; each test overrides the field it is about. */
 function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
   return {
@@ -26,7 +29,7 @@ function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
 }
 
 function renderTable(titles: TitleListItem[] = [title()]) {
-  return render(<TitlesTable titles={titles} />);
+  return render(<TitlesTable titles={titles} onToggleFavorite={noopToggle} />);
 }
 
 describe('Library table (FIL-45)', () => {
@@ -154,15 +157,18 @@ describe('Library table (FIL-45)', () => {
       expect(container.querySelector('.bg-genre-5')).toBeInTheDocument();
     });
 
-    // FIL-46 makes this a button. Until then it is still labelled, because an
-    // icon-only cell that says nothing is unreadable either way.
+    /*
+     * The heart's own behaviour is FIL-46's; what the table owes it is a cell.
+     * The label names the title and the direction, because "Favorite" repeated
+     * down ten rows says neither.
+     */
     it.each([
-      [true, 'Dune: Part Two is a favorite'],
-      [false, 'Dune: Part Two is not a favorite'],
-    ])('labels the heart when favorite is %s', (favorite, label) => {
+      [true, 'Remove Dune: Part Two from favorites'],
+      [false, 'Add Dune: Part Two to favorites'],
+    ])('gives the heart a label when favorite is %s', (favorite, label) => {
       renderTable([title({ favorite })]);
 
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     });
   });
 
