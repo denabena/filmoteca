@@ -27,11 +27,18 @@ export const SIGNED_IN_HOME = '/';
  * make the link useless. `/api/auth` is the proxy to Neon itself and must stay
  * open, since sign-in posts through it before any session exists.
  *
- * Welcome and Setup (SGN/REG onboarding, FIL-21 to FIL-26) belong here too when
- * they land. They are drawn outside the shell, and they run for a user who has
- * an account but has not finished setting it up.
+ * `/welcome` is public because it is the screen a visitor with **no account**
+ * lands on: its two controls are "Get started" (to create an account) and "Sign
+ * in" (WEL-3). Protecting it made the app's own front door redirect to sign-in,
+ * which is only visible once FIL-21/22 and FIL-29 are on the same branch.
+ *
+ * **`/onboarding` is deliberately not public.** Setup runs for somebody who has
+ * an account but has not finished configuring it, so a session exists by then,
+ * and both steps save through `PATCH /api/profile` — which needs a bearer token
+ * and would 401 for a signed-out visitor. Protecting it fails at the door rather
+ * than at the Continue button.
  */
-const PUBLIC_PREFIXES = ['/auth', '/api/auth'];
+const PUBLIC_PREFIXES = ['/auth', '/api/auth', '/welcome'];
 
 /** True when a signed-out visitor is allowed to see this path. */
 export function isPublicPath(pathname: string): boolean {
