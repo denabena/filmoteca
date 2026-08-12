@@ -1,66 +1,29 @@
-import { PageBodySkeleton, PageHeaderSkeleton } from '@/components/ui/page-skeleton';
-import { Skeleton, SkeletonCard, SkeletonText } from '@/components/ui/skeleton';
+import { SettingsCardsSkeleton } from '@/components/ui/settings-skeleton';
 
 /**
- * The Settings loading state (FIL-84).
+ * The Settings route fallback (FIL-84).
  *
- * Settings is the screen where a skeleton earns the most: every field is
- * prefilled from `GET /api/profile`, so an empty form would render first and then
- * fill in, which looks briefly like the account has no name or email. Reserving
- * the rows means the values fade in where they will sit.
+ * Short-lived by nature: the page is a Client Component, so it mounts almost
+ * immediately and then does its own fetching, showing the same cards skeleton
+ * while it waits. The two share `SettingsCardsSkeleton` precisely so the handover
+ * between them is invisible.
+ *
+ * The header is drawn for real rather than as a skeleton, because "Account" and
+ * "Settings" are static copy that needs no data and so should never shimmer.
  */
 export default function SettingsLoading() {
   return (
-    <main className="flex flex-1 flex-col" aria-busy="true" aria-label="Loading your settings">
-      <PageHeaderSkeleton withActions={false} />
+    <div className="flex flex-col">
+      <header className="flex flex-col gap-[3px] px-10 pt-7 pb-[18px]">
+        <p className="text-text-secondary text-[13px] leading-none font-medium">Account</p>
+        <h1 className="font-display text-text-primary text-[24px] leading-[1.16] font-bold tracking-[-0.24px]">
+          Settings
+        </h1>
+      </header>
 
-      <PageBodySkeleton className="gap-[18px]">
-        {/* Profile: photo, name, email. */}
-        <SkeletonCard className="flex flex-col gap-[18px] p-[24px]">
-          <Skeleton className="h-[18px] w-[120px]" />
-          <div className="flex items-center gap-[16px]">
-            <Skeleton className="size-[64px] rounded-full" />
-            <div className="flex flex-col gap-[8px]">
-              <Skeleton className="h-[34px] w-[132px] rounded-[10px]" />
-              <SkeletonText className="h-[11px] w-[180px]" />
-            </div>
-          </div>
-          <div className="rise-list flex flex-col gap-[14px]">
-            {[0, 1].map((i) => (
-              <div key={i} className="flex flex-col gap-[6px]">
-                <SkeletonText className="h-[11px] w-[64px]" />
-                <Skeleton className="h-[40px] w-full max-w-[420px] rounded-[10px]" />
-              </div>
-            ))}
-          </div>
-        </SkeletonCard>
-
-        {/* Preferences: goal stepper, default type, favourite genres, reminders. */}
-        <SkeletonCard className="flex flex-col gap-[18px] p-[24px]">
-          <Skeleton className="h-[18px] w-[148px]" />
-
-          <div className="flex flex-col gap-[6px]">
-            <SkeletonText className="h-[11px] w-[136px]" />
-            <Skeleton className="h-[40px] w-[180px] rounded-[10px]" />
-          </div>
-
-          <div className="flex flex-col gap-[8px]">
-            <SkeletonText className="h-[11px] w-[104px]" />
-            <div className="rise-list flex flex-wrap gap-[8px]">
-              {Array.from({ length: 12 }, (_, i) => (
-                <Skeleton key={i} className="h-[32px] w-[104px] rounded-full" />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <SkeletonText className="h-[13px] w-[220px]" />
-            <Skeleton className="h-[24px] w-[44px] rounded-full" />
-          </div>
-        </SkeletonCard>
-
-        <Skeleton className="h-[40px] w-[148px] rounded-[10px]" />
-      </PageBodySkeleton>
-    </main>
+      <div className="px-10 pb-10">
+        <SettingsCardsSkeleton />
+      </div>
+    </div>
   );
 }

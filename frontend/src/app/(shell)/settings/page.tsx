@@ -7,6 +7,7 @@ import { AuthField } from '@/components/auth/auth-field';
 import { useProfile } from '@/components/profile-provider';
 import { ToggleSwitch } from '@/components/settings/toggle-switch';
 import { GOAL_MAX, GOAL_MIN } from '@/components/goal-stepper';
+import { SettingsCardsSkeleton } from '@/components/ui/settings-skeleton';
 import { avatarInitials } from '@/lib/current-user';
 import { fileToAvatarDataUrl } from '@/lib/image';
 
@@ -40,6 +41,24 @@ interface FieldErrors {
   lastName?: string;
   email?: string;
   monthlyWatchGoal?: string;
+}
+
+/**
+ * The static header, shared by the loading and loaded states.
+ *
+ * Extracted rather than duplicated so the two branches below cannot drift: the
+ * heading must not move or re-render when the profile arrives, or the whole page
+ * appears to reload.
+ */
+function SettingsHeader() {
+  return (
+    <header className="flex flex-col gap-[3px] px-10 pt-7 pb-[18px]">
+      <p className="text-text-secondary text-[13px] leading-none font-medium">Account</p>
+      <h1 className="font-display text-text-primary text-[24px] leading-[1.16] font-bold tracking-[-0.24px]">
+        Settings
+      </h1>
+    </header>
+  );
 }
 
 /**
@@ -190,17 +209,31 @@ export default function SettingsPage() {
 
   const initials = avatarInitials({ firstName, lastName, email });
 
+  /*
+   * The fields are prefilled from `GET /api/profile`, so until it resolves there
+   * is nothing to show but empty inputs. Rendering the skeleton instead does two
+   * things: it stops Settings briefly looking like an account with no name, and it
+   * means the real cards **mount** when the data lands, which is the only way the
+   * `rise-list` stagger below can run at all. A CSS animation fires on mount;
+   * values filling into an already-mounted form animate nothing (FIL-84).
+   */
+  if (loading) {
+    return (
+      <div className="flex flex-col">
+        <SettingsHeader />
+        <div className="px-10 pb-10">
+          <SettingsCardsSkeleton />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
-      <header className="flex flex-col gap-[3px] px-10 pt-7 pb-[18px]">
-        <p className="text-[13px] leading-none font-medium text-text-secondary">Account</p>
-        <h1 className="font-display text-[24px] leading-[1.16] font-bold tracking-[-0.24px] text-text-primary">
-          Settings
-        </h1>
-      </header>
+      <SettingsHeader />
 
       <div className="px-10 pb-10">
-        <div className="flex w-full max-w-[820px] flex-col gap-5">
+        <div className="rise-list flex w-full max-w-[820px] flex-col gap-5">
           {/* Profile card (SET-1, SET-2). */}
           <section className="flex flex-col gap-[18px] rounded-2xl border border-border-default bg-surface-card px-7 pt-6 pb-[26px]">
             <h2 className="text-[18px] leading-[1.3] font-semibold tracking-[-0.18px] text-text-primary">
