@@ -61,6 +61,49 @@ export async function createTitle(input: CreateTitleInput): Promise<CreateTitleF
 }
 
 /**
+ * Saves the Edit title modal (EDT-2 · FIL-61).
+ *
+ * The same shape as `createTitle` on purpose, down to the failure type: the form
+ * is one component and calls whichever of the two applies, so a different return
+ * shape would put a branch in the form for no reason.
+ *
+ * On success it revalidates every view that draws a title, then lands on the
+ * detail screen. That is what makes FIL-61's last criterion true without the
+ * modal knowing anything about it: the page it returns to has already been
+ * re-rendered from the server, so a change made in the modal is visible there
+ * with no reload.
+ *
+ * The dashboard is revalidated too, unlike on the favourite toggle, because a
+ * status or watch-date change moves its stats and its rails.
+ */
+export async function updateTitle(
+  titleId: string,
+  input: CreateTitleInput,
+): Promise<CreateTitleFailure | never> {
+  try {
+    await apiFetch<TitleDetail>(`/api/titles/${titleId}`, { method: 'PUT', body: input });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : '';
+    const fields = [...detail.matchAll(/"([a-zA-Z]+)"/g)].map((match) => match[1]);
+
+    return {
+      message: 'Check the highlighted fields and try again.',
+      fields: fields.filter((field) =>
+        ['name', 'type', 'status', 'genreId', 'rating'].includes(field),
+      ),
+    };
+  }
+
+  revalidatePath('/');
+  revalidatePath('/library');
+  revalidatePath(`/titles/${titleId}`);
+
+  // Outside the try: redirect throws by design, and catching it here would turn
+  // a successful save into a form error.
+  redirect(`/titles/${titleId}`);
+}
+
+/**
  * Flips a title's favourite flag from the FAV column heart (LIB-6 · FIL-46).
  *
  * **Returns the stored state rather than nothing, and the caller needs it.** The

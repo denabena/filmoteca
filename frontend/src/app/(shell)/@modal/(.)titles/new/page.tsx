@@ -1,5 +1,5 @@
 import { RouteModal } from '@/components/shell/route-modal';
-import { AddTitleForm } from '@/components/titles/add-title-form';
+import { TitleForm } from '@/components/titles/title-form';
 import { apiFetch } from '@/lib/api';
 import type { GenreOption } from '@/lib/dashboard';
 
@@ -13,8 +13,8 @@ import type { GenreOption } from '@/lib/dashboard';
  * ../../titles/new/page.tsx, so the URL stays shareable.
  *
  * The form itself is not duplicated. This route supplies the dialog and the
- * genre list; every field, rule and error string stays in `AddTitleForm`, which
- * is FIL-58 to FIL-60's work.
+ * genre list; every field, rule and error string stays in `TitleForm`, which
+ * is FIL-58 to FIL-60's work and is shared with Edit (FIL-61).
  */
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +23,7 @@ export default async function AddTitleModal() {
 
   return (
     <RouteModal label="Add title">
-      <AddTitleForm genres={genres} dismissable />
+      <TitleForm genres={genres} dismissable />
     </RouteModal>
   );
 }
