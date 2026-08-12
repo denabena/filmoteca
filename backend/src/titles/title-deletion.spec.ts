@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FakeTitleTable } from './fake-title-table';
 import { TitlesController } from './titles.controller';
 import { TitlesRepository } from './titles.repository';
+import { TitlesService } from './titles.service';
 
 /**
  * FIL-56's criteria are almost all about what a *different* view says after a
@@ -114,6 +115,7 @@ describe('deleting a title (FIL-56)', () => {
       controllers: [TitlesController],
       providers: [
         TitlesRepository,
+        TitlesService,
         GenresService,
         PickerGateService,
         DashboardService,
