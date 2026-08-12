@@ -1,5 +1,6 @@
 import { PickerBoard } from '@/components/picker/picker-board';
 import { PickerLocked } from '@/components/picker/picker-locked';
+import { PageHeader } from '@/components/shell/page-header';
 import { apiFetch } from '@/lib/api';
 import type { PickCard, PickerGateState } from '@/lib/dashboard';
 
@@ -25,14 +26,9 @@ export default async function PickerPage() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <div className="flex w-full items-center justify-between px-[40px] pt-[28px] pb-[18px]">
-        <div className="flex flex-col gap-[3px]">
-          <p className="text-text-secondary text-[13px] font-medium">AI assistant</p>
-          <h1 className="font-display text-[24px] leading-[1.16] font-bold tracking-[-0.24px]">
-            Scene Picker
-          </h1>
-        </div>
-      </div>
+      {/* Its own strings, the shared component (FIL-28). The Picker header has no
+          page actions, which is the "still aligns with no actions" case. */}
+      <PageHeader overline="AI assistant" title="Scene Picker" />
 
       <div className="flex flex-1 flex-col gap-[20px] px-[40px] pb-[40px]">
         {picker.unlocked ? <PickerBoard picks={picks} /> : <PickerLocked picker={picker} />}

@@ -93,10 +93,14 @@ model Profile {
 /// that creates this table rather than by a seed script, so any environment that
 /// has migrated has them, with no second manual step to forget on deploy.
 ///
-/// A table rather than a Postgres enum for three reasons: listGenresWithCounts
-/// (FIL-43) has to return all twelve including the zeros, `colorSlot` and
+/// A table rather than a Postgres enum for three reasons: the Add title select
+/// has to offer all twelve whether or not the user has used them, `colorSlot` and
 /// `descriptor` are per-genre data that would otherwise be stranded in code, and
 /// the TMDB mapping below has to be changeable without a schema migration.
+///
+/// Note the counts endpoint (FIL-43) returns only the genres a user actually has
+/// titles in, not all twelve with zeros: its acceptance criteria are explicit
+/// that "a genre with no titles does not appear at all".
 model Genre {
   id   String @id @default(uuid()) @db.Uuid
   slug String @unique

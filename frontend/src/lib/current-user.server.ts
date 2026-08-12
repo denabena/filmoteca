@@ -25,10 +25,15 @@ interface ApiProfile {
  * or photo). A failed profile read degrades to the session identity rather than
  * breaking the shell.
  *
- * There is no signed-out branch by design. The shell is for authenticated views
- * only, so no session means redirect to sign-in rather than return a null
- * profile the sidebar would have to defend against. Full route protection is
- * FIL-29; this is the minimum the layout needs to hand the provider a real user.
+ * **There is no signed-out branch, and that is how FIL-83's third criterion is
+ * met.** It asks that a signed-out visitor not see a profile footer. Two ways to
+ * get there: hide the footer, or never render the shell. Redirecting is the one
+ * chosen, because a shell rendered for nobody would need every screen inside it
+ * to have a signed-out variant that the design does not draw, and a sidebar whose
+ * footer is sometimes absent is a second layout to maintain for a state no user
+ * should reach. FIL-29 makes the same call in middleware, so this is now the
+ * second line rather than the only one; keeping both means a new shell route
+ * cannot leak by being missed in a matcher.
  */
 export async function getCurrentUser(): Promise<Profile> {
   const auth = getAuth();

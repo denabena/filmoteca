@@ -46,16 +46,56 @@ export function profileFromUser(user: SessionUser): Profile {
   return { firstName, lastName, email: user.email ?? '' };
 }
 
-/** The sidebar footer form: "Mara K." (SHL-1). */
-export function shortName({ firstName, lastName }: Profile): string {
+/**
+ * The sidebar footer form: "Mara K." (SHL-1).
+ *
+ * **A35 in one function.** The design writes the footer as a first name and a
+ * last initial, but Create account captures a single **Name** field, so what
+ * arrives is whatever the user typed. `profileFromUser` splits on the first
+ * space, which means the shape the design draws only happens for people who
+ * typed two words:
+ *
+ * - "Mara Kovač" reads "Mara K.", exactly as mocked.
+ * - "Mara" reads "Mara", because there is no initial to abbreviate to. That is
+ *   not a designed state, and it is the common one for anybody who types a first
+ *   name only.
+ * - No name at all falls back to the email's local part, because the footer
+ *   rendering blank is worse than rendering something true. Neon Auth allows a
+ *   nameless account, so this is reachable rather than defensive.
+ *
+ * The fallback is a working decision. Splitting the field in two on Create
+ * account is the alternative and is A35's actual question.
+ */
+export function shortName({ firstName, lastName, email }: Profile): string {
   const lastInitial = lastName.trim().charAt(0);
-  return lastInitial ? `${firstName} ${lastInitial}.` : firstName;
+
+  if (firstName.trim()) {
+    return lastInitial ? `${firstName} ${lastInitial}.` : firstName;
+  }
+
+  return emailLocalPart(email);
 }
 
 /**
  * Avatar initials: "MK". The fallback the sidebar shows when the user has no
- * uploaded photo (`Profile.avatarUrl`); derived from the name rather than stored.
+ * uploaded photo (`Profile.avatarUrl`), derived from the name rather than stored.
+ *
+ * Initials used to be the only avatar the app could show, because A28 gives
+ * "Change photo" no designed upload flow. Settings now has one anyway (FIL-76),
+ * so this is a fallback rather than the whole story: **the upload is off-design
+ * and wants a designer's eye.**
+ *
+ * Same A35 fallout as `shortName`: a one-word name yields one letter, and a
+ * nameless account falls back to the email's first letter rather than leaving an
+ * empty circle. An avatar with nothing in it reads as a failed image load.
  */
-export function avatarInitials({ firstName, lastName }: Profile): string {
-  return `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`.toUpperCase();
+export function avatarInitials({ firstName, lastName, email }: Profile): string {
+  const initials = `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`;
+
+  return (initials || emailLocalPart(email).charAt(0)).toUpperCase();
+}
+
+/** Everything before the "@". Empty for an empty address, which cannot render. */
+function emailLocalPart(email: string): string {
+  return email.trim().split('@')[0] ?? '';
 }

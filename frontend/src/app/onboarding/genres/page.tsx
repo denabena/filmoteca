@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GenreChips } from '@/components/onboarding/genre-chips';
 import { OnboardingShell } from '@/components/onboarding/onboarding-shell';
 
@@ -11,14 +11,40 @@ import { OnboardingShell } from '@/components/onboarding/onboarding-shell';
  * "Finish setup" always enabled (A6). Finish saves the selection via the
  * `/api/profile` proxy and opens the Dashboard; Back returns to the goal step.
  *
- * Preserving the goal across Back is FIL-25 (it makes the goal step read the
- * persisted value); this step only navigates there.
+ * FIL-25 wires the flow across both steps: the selection is prefilled from the
+ * persisted profile on mount so it survives a Back to the goal step and forward
+ * again.
  */
 export default function GenresStepPage() {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Prefill from the persisted profile so genres chosen earlier are still
+  // selected after a Back/forward round trip. A missing or failed read leaves
+  // the empty selection, which is a valid state (A6).
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        const response = await fetch('/api/profile');
+        if (!active || !response.ok) return;
+
+        const profile = await response.json();
+        if (active && Array.isArray(profile?.favoriteGenres)) {
+          setSelected(profile.favoriteGenres);
+        }
+      } catch {
+        // Keep the empty selection; the user can still pick and finish.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleFinish() {
     setError(null);
