@@ -31,7 +31,7 @@ export function GenreCards({ genres }: { genres: GenreWithCount[] }) {
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-[18px]">
+    <ul className="rise-list grid grid-cols-2 gap-[18px]">
       {genres.map((genre) => (
         <GenreCard key={genre.id} genre={genre} />
       ))}

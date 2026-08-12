@@ -41,6 +41,31 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
+  /*
+   * **Only navigations are guarded here, and skipping the rest is a bug fix
+   * rather than a loosening.**
+   *
+   * Neon's middleware answers "has a session?" by forwarding *this* request to
+   * its own `get-session` endpoint, which is declared `GET`-only. A Server Action
+   * is a `POST` to the current path, so the forwarded call did not match, the
+   * response came back not-ok, the middleware read that as signed out, and every
+   * action got a 307 to the sign-in page. Verified: `GET /picker` 200,
+   * `POST /picker` 307, same valid session cookie.
+   *
+   * That broke every mutation in the app at once, and invisibly, because a 307 in
+   * reply to an action POST cannot render a login screen. The client just saw a
+   * failed action: "Could not generate picks just now."
+   *
+   * Redirecting a non-navigation was never meaningful anyway. What actually
+   * protects a mutation is unchanged and doubled: `apiFetch` throws without a
+   * session, so no action reaches the API anonymously, and `NeonAuthGuard`
+   * verifies the bearer token on the NestJS side regardless of what this file
+   * decides. This layer is the optimistic UX redirect, by Next's own framing.
+   */
+  if (request.method !== 'GET') {
+    return NextResponse.next();
+  }
+
   const guard = getAuth().middleware({ loginUrl: SIGN_IN_PATH });
 
   return guard(request);

@@ -85,3 +85,97 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-sans);
 }
+
+/*
+ * Motion and loading (FIL-84).
+ *
+ * Plain CSS rather than Tailwind utilities on purpose: the stagger below needs
+ * `nth-child`, so a list gets one class on its container instead of an index
+ * threaded through every child component.
+ *
+ * The design specifies no motion at all, so both the distance and the duration
+ * are working decisions, chosen to be felt rather than watched: 8px and 260ms on
+ * a decelerating curve. Anything longer reads as the app being slow, which is the
+ * opposite of the point.
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* One element arriving. `both` holds the from-state during any delay, so nothing
+   flashes at full opacity before it starts. */
+.rise {
+  animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * A list arriving, each child a beat after the one above it.
+ *
+ * Capped at eight, then everything later shares the last delay: a 28-row library
+ * would otherwise take over a second to finish arriving, and the rows past the
+ * fold animate where nobody is looking.
+ */
+.rise-list > * {
+  animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rise-list > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.rise-list > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.rise-list > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.rise-list > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.rise-list > *:nth-child(6) {
+  animation-delay: 200ms;
+}
+.rise-list > *:nth-child(7) {
+  animation-delay: 240ms;
+}
+.rise-list > *:nth-child(n + 8) {
+  animation-delay: 280ms;
+}
+
+/* The shimmer every skeleton shares. Opacity only, so it cannot shift layout. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton {
+  background: var(--color-surface-muted);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/*
+ * **Respected, not optional.** Vestibular disorders make even small movement
+ * genuinely unpleasant, and a loading skeleton that pulses forever is the worst
+ * offender on a page somebody is waiting on. Everything above degrades to its
+ * finished state, so nothing disappears; it simply arrives without moving.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .rise-list > * {
+    animation: none;
+  }
+
+  .skeleton {
+    animation: none;
+  }
+}
