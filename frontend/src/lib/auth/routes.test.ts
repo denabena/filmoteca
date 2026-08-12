@@ -20,6 +20,9 @@ describe('the shell boundary (FIL-29)', () => {
       '/auth/reset-password',
       // Sign-in posts through here before any session exists.
       '/api/auth/sign-in/email',
+      // The front door: its two controls are "Get started" and "Sign in", so a
+      // visitor reaching it has no account yet (WEL-3, FIL-21/22).
+      '/welcome',
     ])('lets a signed-out visitor reach %s', (pathname) => {
       expect(isPublicPath(pathname)).toBe(true);
     });
@@ -31,6 +34,10 @@ describe('the shell boundary (FIL-29)', () => {
       ['settings', '/settings'],
       ['a title detail page', '/titles/8f1c/'],
       ['the add title route', '/titles/new'],
+      // Setup runs for somebody who already has an account, and both steps save
+      // through `PATCH /api/profile`, which needs a bearer token.
+      ['the onboarding goal step', '/onboarding/goal'],
+      ['the onboarding genres step', '/onboarding/genres'],
     ])('protects %s', (_label, pathname) => {
       expect(isPublicPath(pathname)).toBe(false);
     });
