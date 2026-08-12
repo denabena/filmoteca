@@ -11,6 +11,13 @@ export interface Profile {
   firstName: string;
   lastName: string;
   email: string;
+  /**
+   * The uploaded profile photo as a data URL, or null/undefined when the user
+   * has none. Optional so the many places that build a Profile from a name alone
+   * (the session, tests) need not carry it; the sidebar falls back to initials
+   * whenever it is absent.
+   */
+  avatarUrl?: string | null;
 }
 
 /**
@@ -70,9 +77,13 @@ export function shortName({ firstName, lastName, email }: Profile): string {
 }
 
 /**
- * Avatar initials: "MK". Derived from the name rather than stored, because
- * "Change photo" has no designed upload flow (A28), so initials are the only
- * avatar the app can ever show.
+ * Avatar initials: "MK". The fallback the sidebar shows when the user has no
+ * uploaded photo (`Profile.avatarUrl`), derived from the name rather than stored.
+ *
+ * Initials used to be the only avatar the app could show, because A28 gives
+ * "Change photo" no designed upload flow. Settings now has one anyway (FIL-76),
+ * so this is a fallback rather than the whole story: **the upload is off-design
+ * and wants a designer's eye.**
  *
  * Same A35 fallout as `shortName`: a one-word name yields one letter, and a
  * nameless account falls back to the email's first letter rather than leaving an

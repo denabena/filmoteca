@@ -130,12 +130,24 @@ export function Sidebar() {
         right without a fixed width.
       */}
       <div className="flex items-center gap-2.5 pt-4 pl-2">
-        <span
-          aria-hidden="true"
-          className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-surface-elevated text-[12px] leading-[normal] font-medium text-text-primary"
-        >
-          {avatarInitials(profile)}
-        </span>
+        {profile.avatarUrl ? (
+          // A user-uploaded data URL, not a remote asset, so next/image (which
+          // needs a loader and known dimensions) buys nothing here.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={profile.avatarUrl}
+            alt=""
+            aria-hidden="true"
+            className="size-[34px] shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-surface-elevated text-[12px] leading-[normal] font-medium text-text-primary"
+          >
+            {avatarInitials(profile)}
+          </span>
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-[13px] leading-[normal] font-semibold text-text-primary">
             {shortName(profile)}
