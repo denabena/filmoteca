@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { TitleStatus } from '@prisma/client';
 import { NeonAuthGuard, type NeonAuthUser } from '../auth/neon-auth.guard';
@@ -21,6 +21,7 @@ describe('TitlesController', () => {
   const create = jest.fn();
   const findByIdOrThrow = jest.fn();
   const findManyWithGenre = jest.fn();
+  const update = jest.fn();
 
   let controller: TitlesController;
 
@@ -35,13 +36,14 @@ describe('TitlesController', () => {
     create.mockReset().mockResolvedValue({});
     findByIdOrThrow.mockReset().mockResolvedValue({});
     findManyWithGenre.mockReset().mockResolvedValue([]);
+    update.mockReset().mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TitlesController],
       providers: [
         {
           provide: TitlesRepository,
-          useValue: { create, findByIdOrThrow, findManyWithGenre },
+          useValue: { create, findByIdOrThrow, findManyWithGenre, update },
         },
       ],
     })
@@ -128,6 +130,111 @@ describe('TitlesController', () => {
     await expect(
       controller.createTitle(user, { ...valid, rating }),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  // FIL-55. The Edit modal submits the whole form, so this is a PUT: an omitted
+  // optional field means "cleared", which a PATCH could not distinguish from
+  // "leave it alone".
+  describe('updating a title (FIL-55)', () => {
+    const ID = '5e0b1b6a-0f2c-4d8e-9a3b-2c1d4e5f6a7b';
+
+    it('writes every changed field to the caller’s own title', async () => {
+      await controller.updateTitle(user, ID, {
+        ...valid,
+        name: 'Dune: Part One',
+        status: 'watched',
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        'neon-user-123',
+        ID,
+        expect.objectContaining({
+          name: 'Dune: Part One',
+          status: 'watched',
+        }),
+      );
+    });
+
+    it('moves a title between genres', async () => {
+      await controller.updateTitle(user, ID, {
+        ...valid,
+        genreId: 'other-genre-uuid',
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        'neon-user-123',
+        ID,
+        expect.objectContaining({ genreId: 'other-genre-uuid' }),
+      );
+    });
+
+    // An empty string is a note that exists and is blank, which renders
+    // differently on the detail screen from no note at all.
+    it('stores a cleared optional field as absent, not as an empty string', async () => {
+      await controller.updateTitle(user, ID, {
+        ...valid,
+        note: '   ',
+        watchDate: '',
+        rating: null,
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        'neon-user-123',
+        ID,
+        expect.objectContaining({ note: null, watchDate: null, rating: null }),
+      );
+    });
+
+    // FIL-54's rule, restated as FIL-55's criterion: the added date is the
+    // server's. `parseTitlePayload` has no branch that reads it, so it cannot
+    // reach the repository however it is spelt.
+    it.each(['createdAt', 'addedAt', 'id', 'userId'])(
+      'ignores %s in the payload',
+      async (field) => {
+        await controller.updateTitle(user, ID, {
+          ...valid,
+          [field]: '1999-01-01T00:00:00.000Z',
+        });
+
+        const calls = update.mock.calls as [string, string, object][];
+        expect(calls[0][2]).not.toHaveProperty(field);
+      },
+    );
+
+    // The shared parser is what makes this true; there is no second copy of the
+    // rules here to drift from create's.
+    it.each([
+      ['name', { ...valid, name: '  ' }],
+      ['type', { ...valid, type: 'film' }],
+      ['status', { ...valid, status: 'someday' }],
+      ['genreId', { ...valid, genreId: '' }],
+    ])('applies create’s %s rule', async (field, body) => {
+      await expect(controller.updateTitle(user, ID, body)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('applies create’s rating rule', async () => {
+      await expect(
+        controller.updateTitle(user, ID, { ...valid, rating: 11 }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    /*
+     * The 404 is the repository's, which checks ownership before it writes. What
+     * this asserts is that the controller does not swallow it into a 200 or
+     * translate it into a 403: a 403 would confirm the row exists and so leak
+     * another account's data by omission.
+     */
+    it("returns 404 for another user's title and writes nothing", async () => {
+      update.mockRejectedValue(new NotFoundException('Title not found'));
+
+      await expect(controller.updateTitle(user, ID, valid)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 
   // FIL-41. These assert the query the controller builds rather than the rows a
