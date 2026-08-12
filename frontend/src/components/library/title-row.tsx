@@ -1,29 +1,70 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import type { MouseEvent } from 'react';
 import { Icon } from '@/components/dashboard/icon';
 import { genreColorClass } from '@/lib/dashboard';
 import { STATUS_TONE, titleCaption, type TitleListItem } from '@/lib/library';
+import { RowMenu } from './row-menu';
 import { StarRating } from './star-rating';
 
 /**
- * One row of the library table (LIB-5 · FIL-45).
+ * One row of the library table (LIB-5 · FIL-45), and the two ways out of it
+ * (LIB-7 · FIL-47).
  *
- * The row is presentation only. Clicking it, the kebab menu and the favourite
- * toggle are FIL-46, FIL-47 and FIL-62; the heart and the kebab render here as
- * static marks so the row has its designed anatomy, and those tickets make them
- * interactive. Shipping the cells without the columns would mean re-laying the
- * table out twice.
+ * **The row is clickable and that is a working decision (A15).** The design never
+ * draws a click target on a row, but frame 07 carries a "Library" breadcrumb, so
+ * the row has to be how you reach the detail screen. Nothing else could be.
+ *
+ * **The whole row navigates, but the title name is a real `<Link>`, and both
+ * matter.** The link is what a keyboard and a screen reader use: it is one tab
+ * stop per row, Enter opens the title natively, and the destination is visible in
+ * the status bar on hover. The row's own click handler is what makes the rest of
+ * the row's empty space clickable for a pointer, which is what the criterion
+ * asks for and what a link alone cannot do.
+ *
+ * The alternative, stretching the link across the row with an absolutely
+ * positioned pseudo-element, needs `position: relative` on a `<tr>`, whose
+ * containing-block behaviour is not reliable across engines. This does the same
+ * job with no layout risk.
+ *
+ * Clicks on a control inside the row are ignored by the handler, found by
+ * `data-row-action` rather than by naming the heart and the kebab. A marker means
+ * a cell that gains a button later cannot silently start navigating.
  */
 export function TitleRow({ title }: { title: TitleListItem }) {
   const status = STATUS_TONE[title.status];
+  const router = useRouter();
+  const href = `/titles/${title.id}`;
+
+  function onRowClick(event: MouseEvent<HTMLTableRowElement>) {
+    const target = event.target as HTMLElement;
+
+    // The heart, the kebab and the title link handle themselves. Without this the
+    // kebab would open its menu and navigate away from it in the same click.
+    if (target.closest('[data-row-action]') || target.closest('a')) {
+      return;
+    }
+
+    router.push(href);
+  }
 
   return (
-    <tr className="border-border-default border-t">
+    <tr
+      onClick={onRowClick}
+      className="border-border-default hover:bg-surface-card-raised cursor-pointer border-t transition-colors"
+    >
       <td className="py-[14px] pr-[16px] pl-[24px]">
         <div className="flex items-center gap-[14px]">
           <PosterTile colorSlot={title.genre.colorSlot} />
           <div className="flex min-w-0 flex-col gap-[2px]">
-            <span className="truncate text-[14px] leading-[1.3] font-semibold text-text-primary">
+            <Link
+              href={href}
+              className="truncate text-[14px] leading-[1.3] font-semibold text-text-primary outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
+            >
               {title.name}
-            </span>
+            </Link>
             <span className="text-text-tertiary truncate text-[12.5px] leading-[1.3]">
               {titleCaption(title)}
             </span>
@@ -65,7 +106,7 @@ export function TitleRow({ title }: { title: TitleListItem }) {
       </td>
 
       <td className="py-[14px] pr-[24px] pl-[16px]">
-        <KebabMark />
+        <RowMenu titleName={title.name} />
       </td>
     </tr>
   );
@@ -100,31 +141,18 @@ function PosterTile({ colorSlot }: { colorSlot: number }) {
  *
  * FIL-46 turns this into a button with an optimistic toggle. Until then it is
  * still labelled for a screen reader, because an icon-only cell that says
- * nothing is unreadable whether or not it is clickable.
+ * nothing is unreadable whether or not it is clickable, and it carries
+ * `data-row-action` already so a click on it never navigates the row.
  */
 function FavoriteMark({ favorite, name }: { favorite: boolean; name: string }) {
   return (
-    <span className={favorite ? 'text-accent' : 'text-text-tertiary'}>
+    <span data-row-action className={favorite ? 'text-accent' : 'text-text-tertiary'}>
       <span aria-hidden="true" className="text-[15px]">
         {favorite ? '♥' : '♡'}
       </span>
       <span className="sr-only">
         {favorite ? `${name} is a favorite` : `${name} is not a favorite`}
       </span>
-    </span>
-  );
-}
-
-/**
- * The row menu's trigger, as a static mark. FIL-47 makes it a button and FIL-62
- * gives it a menu; the column exists here so neither has to re-lay the table out.
- */
-function KebabMark() {
-  return (
-    <span className="text-text-tertiary flex flex-col items-center gap-[3px]" aria-hidden="true">
-      <span className="block size-[3px] rounded-full bg-current" />
-      <span className="block size-[3px] rounded-full bg-current" />
-      <span className="block size-[3px] rounded-full bg-current" />
     </span>
   );
 }
