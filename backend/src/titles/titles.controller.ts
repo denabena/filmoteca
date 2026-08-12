@@ -2,7 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -184,6 +187,33 @@ export class TitlesController {
     @Body() body: TitlePayloadBody,
   ): Promise<Title> {
     return this.titles.update(user.id, id, parseTitlePayload(body));
+  }
+
+  /**
+   * Deletes a title (DEL-2, DEL-3 · FIL-56).
+   *
+   * **A hard delete, and the design is what decides that.** DEL-3's copy reads
+   * "permanently removed" and "can't be undone", so a `deletedAt` flag would make
+   * the dialog lie: the row would still be there, and every derived query would
+   * need a filter that someone eventually forgets. The rating, note and watch
+   * date go with it because they are columns on the same row.
+   *
+   * 204 with no body: there is nothing meaningful to return, and the dialog's
+   * next step is navigating back to the list rather than rendering a response.
+   *
+   * Deleting an id that is already gone is a 404 rather than a 500, which falls
+   * out of the repository's ownership check running before the write: "not yours"
+   * and "not there" are the same answer, which is also what stops a 404 sweep
+   * confirming which ids exist in someone else's library.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(NeonAuthGuard)
+  async deleteTitle(
+    @CurrentUser() user: NeonAuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.titles.delete(user.id, id);
   }
 }
 
