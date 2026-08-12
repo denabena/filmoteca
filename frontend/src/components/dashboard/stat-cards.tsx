@@ -11,7 +11,7 @@ import { Icon } from './icon';
  */
 export function StatCards({ stats }: { stats: MonthlyStats }) {
   return (
-    <div className="rise-list flex w-full items-start gap-[20px]">
+    <div className="rise-list flex w-full flex-col items-stretch gap-[20px] sm:flex-row sm:items-start">
       <WatchedCard stats={stats} />
       <AverageRatingCard rating={stats.averageRating} />
       <TopGenreCard topGenre={stats.topGenre} />

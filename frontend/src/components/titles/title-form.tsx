@@ -92,7 +92,7 @@ export function TitleForm({
   return (
     <form
       action={submit}
-      className="bg-surface-card border-border-default flex w-[520px] flex-col gap-[16px] rounded-[18px] border p-[28px]"
+      className="bg-surface-card border-border-default flex w-full max-w-[520px] flex-col gap-[16px] rounded-[18px] border p-4 sm:p-[28px]"
     >
       <div className="flex items-center justify-between">
         <h1 className="font-display text-[20px] leading-[1.22] font-bold tracking-[-0.1px]">

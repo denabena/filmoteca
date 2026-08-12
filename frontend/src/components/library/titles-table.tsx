@@ -30,8 +30,8 @@ export function TitlesTable({
   onMarkWatched: MarkWatched;
 }) {
   return (
-    <div className="bg-surface-card border-border-default max-h-[calc(100vh-260px)] overflow-y-auto rounded-[18px] border">
-      <table className="w-full border-separate border-spacing-0 text-left">
+    <div className="bg-surface-card border-border-default max-h-[calc(100vh-260px)] overflow-auto rounded-[18px] border">
+      <table className="w-full min-w-[680px] border-separate border-spacing-0 text-left">
         {/*
           Deliberately not "Your watchlist": that is the page header's overline,
           and repeating it would make a screen reader announce the same phrase

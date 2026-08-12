@@ -36,10 +36,10 @@ export function SettingsCardsSkeleton() {
         </div>
 
         <div className="flex flex-col gap-[14px]">
-          {['w-[300px]', 'w-[300px]', 'w-[420px]'].map((width, i) => (
+          {['sm:w-[300px]', 'sm:w-[300px]', 'sm:w-[420px]'].map((width, i) => (
             <div key={i} className="flex flex-col gap-[6px]">
               <SkeletonText className="h-[11px] w-[76px]" />
-              <Skeleton className={`h-[46px] rounded-xl ${width}`} />
+              <Skeleton className={`h-[46px] w-full rounded-xl ${width}`} />
             </div>
           ))}
         </div>
@@ -51,15 +51,15 @@ export function SettingsCardsSkeleton() {
 
         <div className="flex flex-col gap-[6px]">
           <SkeletonText className="h-[11px] w-[136px]" />
-          <Skeleton className="h-[46px] w-[180px] rounded-xl" />
+          <Skeleton className="h-[46px] w-full max-w-[180px] rounded-xl" />
         </div>
 
         <div className="flex flex-col gap-[6px]">
           <SkeletonText className="h-[11px] w-[92px]" />
-          <Skeleton className="h-[46px] w-[220px] rounded-xl" />
+          <Skeleton className="h-[46px] w-full max-w-[220px] rounded-xl" />
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-[12px]">
           <div className="flex flex-col gap-[5px]">
             <SkeletonText className="h-[13px] w-[152px]" />
             <SkeletonText className="h-[11px] w-[240px]" />
@@ -71,8 +71,8 @@ export function SettingsCardsSkeleton() {
       {/* Genres: the derived count line and its inert action. */}
       <SkeletonCard className="flex flex-col gap-[18px] rounded-2xl px-7 pt-6 pb-[26px]">
         <Skeleton className="h-[18px] w-[74px]" />
-        <div className="flex items-center justify-between">
-          <SkeletonText className="h-[13px] w-[320px]" />
+        <div className="flex flex-wrap items-center justify-between gap-[12px]">
+          <SkeletonText className="h-[13px] w-full max-w-[320px]" />
           <Skeleton className="h-[34px] w-[124px] rounded-xl" />
         </div>
       </SkeletonCard>

@@ -25,7 +25,7 @@ export function LibraryControls({
   onChange: (next: LibraryFilters) => void;
 }) {
   return (
-    <div className="flex items-center gap-[10px]">
+    <div className="flex flex-wrap items-center gap-[10px]">
       <label className="relative">
         <span className="sr-only">Search titles</span>
         <Icon

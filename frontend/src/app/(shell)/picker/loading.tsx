@@ -42,7 +42,7 @@ export default function PickerLoading() {
         </SkeletonCard>
 
         {/* Three pick cards (PIC-6). */}
-        <div className="rise-list flex gap-[18px]">
+        <div className="rise-list flex flex-col gap-[18px]">
           {Array.from({ length: 3 }, (_, i) => (
             <SkeletonCard key={i} className="flex flex-1 flex-col gap-[14px] p-[18px]">
               <Skeleton className="h-[240px] w-full rounded-[12px]" />

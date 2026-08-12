@@ -25,7 +25,7 @@ export function TitleDetailCard({
     .join(' · ');
 
   return (
-    <div className="rise flex w-full items-start gap-[20px]">
+    <div className="rise flex w-full flex-col items-stretch gap-[20px] lg:flex-row lg:items-start">
       <section className="bg-surface-card border-border-default flex flex-1 items-start gap-[28px] rounded-[18px] border p-[24px]">
         <Poster
           posterPath={title.posterPath}
@@ -89,7 +89,7 @@ export function TitleDetailCard({
         </div>
       </section>
 
-      <div className="flex w-[300px] shrink-0 flex-col gap-[20px]">
+      <div className="flex w-full shrink-0 flex-col gap-[20px] lg:w-[300px]">
         <section
           aria-labelledby="details-heading"
           className="bg-surface-card border-border-default flex flex-col gap-[12px] rounded-[16px] border px-[24px] py-[20px]"

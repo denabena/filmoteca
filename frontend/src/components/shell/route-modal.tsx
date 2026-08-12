@@ -93,7 +93,7 @@ export function RouteModal({ label, children }: { label: string; children: React
      */
     <div
       onClick={() => router.back()}
-      className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-canvas/70 px-[40px] py-[40px] backdrop-blur-[2px]"
+      className="bg-canvas/70 fixed inset-0 z-40 flex items-start justify-center overflow-y-auto px-3 py-4 backdrop-blur-[2px] sm:px-[40px] sm:py-[40px]"
     >
       <div
         ref={panelRef}

@@ -25,7 +25,9 @@ export default async function AppLayout({
     <ProfileProvider initialProfile={profile}>
       <Sidebar />
       {/* Matches the sidebar's fixed 260px so content is never underneath it. */}
-      <div className="flex min-h-screen flex-1 flex-col pl-[260px]">{children}</div>
+      <div className="flex min-h-screen flex-1 flex-col pt-[56px] md:pt-0 md:pl-[260px]">
+        {children}
+      </div>
       {/*
         The `@modal` parallel route (FIL-28, FIL-44). Empty on every normal
         navigation via its default.tsx; an intercepted route such as

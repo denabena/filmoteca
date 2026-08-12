@@ -183,9 +183,76 @@ describe('Sidebar', () => {
   it('reaches every link by keyboard in visual order', async () => {
     renderSidebar();
 
+    /*
+     * The mobile menu toggle is the first stop. It is hidden from sight above
+     * `md` by CSS only, so it stays in the DOM and in the tab order at every
+     * width, and jsdom has no viewport to hide it from.
+     *
+     * Deliberately not `hidden` below `md`: toggling `display` per breakpoint
+     * needs JS to read the viewport, which means the first paint can disagree
+     * with the client and the button flickers. One always-present control that
+     * CSS positions offscreen is simpler and cannot desync.
+     */
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveFocus();
+
     for (const name of ['Dashboard', 'Library', 'Picker', 'Settings']) {
       await userEvent.tab();
       expect(screen.getByRole('link', { name })).toHaveFocus();
     }
+  });
+
+  /*
+   * The drawer's own behaviour. Above `md` it is simply always open, so these
+   * assertions describe the phone.
+   *
+   * The toggle is one control that renames, not two that swap, so focus survives
+   * the press. `aria-expanded` is what a screen reader reads, so it is asserted
+   * rather than the class that does the sliding.
+   */
+  it('toggles the mobile drawer open and shut', async () => {
+    renderSidebar();
+
+    const toggle = screen.getByRole('button', { name: 'Open menu' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', 'app-sidebar');
+
+    await userEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Close menu' })).toBe(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  // An overlay that cannot be dismissed from the keyboard is a trap.
+  it('closes the drawer on Escape', async () => {
+    renderSidebar();
+
+    const toggle = screen.getByRole('button', { name: 'Open menu' });
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  /*
+   * The scrim is a pointer affordance only: `aria-hidden` and untabbable, so it
+   * does not become a second thing called "Close menu" in the accessibility tree.
+   * Escape and the toggle are the keyboard paths, both covered above.
+   */
+  it('keeps the scrim out of the accessibility tree', async () => {
+    renderSidebar();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    expect(screen.getAllByRole('button', { name: 'Close menu' })).toHaveLength(1);
   });
 });

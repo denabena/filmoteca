@@ -9,7 +9,7 @@ import { Skeleton, SkeletonCard, SkeletonText } from './skeleton';
  */
 export function PageHeaderSkeleton({ withActions = true }: { withActions?: boolean }) {
   return (
-    <header className="flex w-full items-center justify-between px-[40px] pt-[28px] pb-[18px]">
+    <header className="flex w-full flex-wrap items-center justify-between gap-[12px] px-4 pt-[22px] pb-[18px] md:px-[40px] md:pt-[28px]">
       <div className="flex flex-col gap-[3px]">
         <SkeletonText className="h-[13px] w-[96px]" />
         <Skeleton className="h-[28px] w-[220px] rounded-[6px]" />
@@ -32,7 +32,11 @@ export function PageBodySkeleton({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={`flex flex-1 flex-col px-[40px] pb-[40px] ${className}`}>{children}</div>;
+  return (
+    <div className={`flex flex-1 flex-col px-4 pb-[40px] md:px-[40px] ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 /**

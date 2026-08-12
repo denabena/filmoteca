@@ -78,7 +78,7 @@ export function DashboardView({
 
       {/* `rise-list` staggers the hero, then the rail, then the stats block, so
           the dashboard arrives top to bottom rather than all at once (FIL-84). */}
-      <div className="rise-list flex flex-1 flex-col gap-[12px] px-[40px] pb-[14px]">
+      <div className="rise-list flex flex-1 flex-col gap-[12px] px-4 pb-[14px] md:px-[40px]">
         {hero}
         {rail}
         <div
@@ -86,7 +86,7 @@ export function DashboardView({
           aria-busy={isPending}
         >
           <StatCards stats={stats} />
-          <div className="rise-list flex w-full items-stretch gap-[20px]">
+          <div className="rise-list flex w-full flex-col items-stretch gap-[20px] xl:flex-row">
             <WatchActivity activity={stats.activity} />
             {teaser}
           </div>

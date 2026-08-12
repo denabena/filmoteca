@@ -84,7 +84,7 @@ export default function GoalStepPage() {
 
   return (
     <OnboardingShell step={1}>
-      <div className="relative flex w-[540px] max-w-full flex-col items-center gap-3.5 rounded-[20px] border border-border-default bg-surface-card px-12 pt-10 pb-9 text-center">
+      <div className="relative flex w-[540px] max-w-full flex-col items-center gap-3.5 rounded-[20px] border border-border-default bg-surface-card px-5 pt-10 pb-9 text-center sm:px-12">
         <p className="text-[11px] leading-none font-medium tracking-[0.88px] text-accent">
           STEP 1 OF 2
         </p>

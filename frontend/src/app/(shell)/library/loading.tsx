@@ -17,16 +17,16 @@ export default function LibraryLoading() {
 
       <PageBodySkeleton>
         {/* Tab pair on the left, the three controls on the right (LIB-2). */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-stretch justify-between gap-[12px] lg:flex-row lg:items-center">
           <Skeleton className="h-[36px] w-[196px] rounded-[10px]" />
-          <div className="flex items-center gap-[10px]">
+          <div className="flex flex-wrap items-center gap-[10px]">
             <Skeleton className="h-[36px] w-[200px] rounded-[10px]" />
             <Skeleton className="h-[36px] w-[120px] rounded-[10px]" />
             <Skeleton className="h-[36px] w-[132px] rounded-[10px]" />
           </div>
         </div>
 
-        <SkeletonCard className="flex flex-col overflow-hidden">
+        <SkeletonCard className="flex flex-col overflow-x-auto">
           {/* Header row: TITLE, GENRE, STATUS, RATING, FAV, and the kebab column. */}
           <div className="border-border-strong flex items-center gap-[16px] border-b px-[20px] py-[12px]">
             <SkeletonText className="h-[10px] w-[52px]" />

@@ -19,7 +19,7 @@ function HeroFrame({ children }: { children: React.ReactNode }) {
   return (
     <section
       aria-labelledby="continue-watching-heading"
-      className="border-border-default relative h-[264px] w-full overflow-hidden rounded-[18px] border bg-gradient-to-r from-[#181c22] to-[#201c34]"
+      className="border-border-default relative min-h-[264px] w-full overflow-hidden rounded-[18px] border bg-gradient-to-r from-[#181c22] to-[#201c34] sm:h-[264px]"
     >
       {children}
     </section>
