@@ -104,6 +104,35 @@ export async function updateTitle(
 }
 
 /**
+ * Deletes a title from the confirmation dialog (DEL-2, DEL-3 · FIL-63).
+ *
+ * **Lands on the Library, and from either entry point.** That is a criterion,
+ * and it is also the only sensible destination: the row menu opens this over the
+ * Library, the Edit modal opens it over whatever that was over, and the detail
+ * page of a title that no longer exists is a 404. Redirecting rather than going
+ * back is what makes both paths end in the same place.
+ *
+ * Failure returns a message rather than throwing, so the dialog can say so and
+ * leave the user where they are. A destructive action that vanishes without
+ * confirming is worse than one that says it did not work.
+ */
+export async function deleteTitle(titleId: string): Promise<{ message: string } | never> {
+  try {
+    await apiFetch<void>(`/api/titles/${titleId}`, { method: 'DELETE' });
+  } catch {
+    return { message: 'Could not delete this title. Please try again.' };
+  }
+
+  // Everything derived from titles: the genre cards, the dashboard stats and
+  // rails, and the list itself. The backend recomputes all of it on read
+  // (FIL-56), so this is only about clearing the router cache.
+  revalidatePath('/');
+  revalidatePath('/library');
+
+  redirect('/library');
+}
+
+/**
  * Marks a title watched from the row menu (MNU-2 · FIL-62).
  *
  * Returns `true` on success rather than throwing, for the same reason
