@@ -7,7 +7,14 @@
     // which breaks `start:prod` with a confusing "cannot find module" and no
     // compile error. Stating it means a stray root-level file fails loudly at
     // build time instead.
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // Disable incremental builds. `nest-cli` deleteOutDir wipes `dist` on every
+    // build, but tsc writes `tsconfig.build.tsbuildinfo` at the package root
+    // (outside `dist`), so it survives the wipe and convinces tsc the output is
+    // up to date - it then emits nothing and `start`/`start:prod` fail with a
+    // "Cannot find module dist/main". Turning incremental off means every build
+    // emits, reliably.
+    "incremental": false
   },
   // prisma.config.ts sits at the package root rather than under src/, and the
   // Prisma CLI loads it itself, so it never needs compiling. It stays excluded:

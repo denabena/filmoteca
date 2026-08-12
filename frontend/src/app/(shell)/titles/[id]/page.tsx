@@ -36,17 +36,16 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ id
           <span className="text-text-primary font-medium">{title.name}</span>
         </nav>
         {/*
-         * Edit title (09) is FIL-61's screen and has no route yet. Disabled
-         * rather than removed, so the header keeps the shape the design draws.
-         */}
-        <button
-          type="button"
-          disabled
-          title="Editing arrives with FIL-61"
-          className="bg-surface-card-raised border-border-strong text-text-primary cursor-not-allowed rounded-[12px] border px-[20px] py-[13px] text-[14px] font-semibold opacity-60"
+          DET-1's entry point into Edit title, live now that FIL-61 exists. A
+          `Link`, so the intercepting route turns an in-app click into the modal
+          over this page while a pasted URL still gets the full screen.
+        */}
+        <Link
+          href={`/titles/${title.id}/edit`}
+          className="bg-surface-card-raised border-border-strong text-text-primary rounded-[12px] border px-[20px] py-[13px] text-[14px] font-semibold outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
         >
           Edit details
-        </button>
+        </Link>
       </div>
 
       <div className="px-[40px] pb-[40px]">
