@@ -40,6 +40,29 @@ function renderPage() {
 }
 
 describe('SettingsPage', () => {
+  /*
+   * FIL-84. The fields are prefilled from a fetch in an effect, so before it
+   * resolves the form used to render with empty inputs and the values then snapped
+   * in: Settings briefly read as an account with no name.
+   *
+   * Showing the skeleton until the profile lands is also what makes the arrival
+   * animation possible, since the real cards only then mount and a CSS animation
+   * fires on mount. Asserting the header survives the swap matters too: it is
+   * static copy, and if it unmounted the page would look like it reloaded.
+   */
+  it('shows a loading state instead of an empty form, then the real fields', async () => {
+    renderPage();
+
+    expect(screen.getByLabelText('Loading your settings')).toBeInTheDocument();
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByLabelText('First name')).toHaveValue('Mara'));
+
+    expect(screen.queryByLabelText('Loading your settings')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+  });
+
   it('prefills the form from the stored profile', async () => {
     renderPage();
 
