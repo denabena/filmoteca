@@ -128,6 +128,23 @@ export class PicksService {
 
     const batchId = randomUuid();
 
+    /*
+     * One timestamp for the whole batch, and it has to be stamped here rather
+     * than left to `@default(now())` or a per-row `new Date()`.
+     *
+     * A batch is a single generation event, so its rows share a time by
+     * definition. Letting each row take its own put them milliseconds apart,
+     * which silently broke the dashboard: `getTopPick` orders by `generatedAt`
+     * desc before `rank` asc, so the last row written won on the first key and
+     * the teaser advertised rank 2 while the Picker page listed rank 0 first.
+     * Two screens promising the same card showed different films.
+     *
+     * `getTopPick` now resolves the batch by id as well, so this is belt and
+     * braces: either fix alone is enough, and the data being right matters
+     * independently of who reads it.
+     */
+    const generatedAt = new Date();
+
     const created = await this.prisma.$transaction(
       scored.map((entry, rank) =>
         this.prisma.pick.upsert({
@@ -154,6 +171,7 @@ export class PicksService {
             reason: entry.reason,
             moods,
             state: 'suggested',
+            generatedAt,
           },
           update: {
             batchId,
@@ -162,7 +180,7 @@ export class PicksService {
             reason: entry.reason,
             moods,
             state: 'suggested',
-            generatedAt: new Date(),
+            generatedAt,
           },
           include: { genre: true },
         }),

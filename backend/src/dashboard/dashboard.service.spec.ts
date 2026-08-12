@@ -50,12 +50,110 @@ function title(overrides: Partial<Title> = {}): Title {
   };
 }
 
+/** A `picks` row as `getTopPick` reads it, joined to its genre. */
+function pick(
+  overrides: {
+    rank: number;
+    name: string;
+    generatedAt?: string;
+    batchId?: string;
+    state?: string;
+  } = { rank: 0, name: 'Arrival' },
+) {
+  const {
+    rank,
+    name,
+    generatedAt = '2026-10-17T09:00:00Z',
+    batchId = 'batch-1',
+    state = 'suggested',
+  } = overrides;
+
+  return {
+    id: `pick-rank-${rank}`,
+    userId: USER,
+    batchId,
+    rank,
+    state,
+    generatedAt: new Date(generatedAt),
+    name,
+    year: 2016,
+    type: 'movie' as const,
+    posterPath: '/arrival.jpg',
+    reason: 'Because you rated Blade Runner 2049 highly.',
+    genre: { name: 'Sci-Fi', colorSlot: 1 },
+  };
+}
+
+type PickRow = ReturnType<typeof pick>;
+
+/**
+ * The slice of `prisma.pick.findFirst` that `getTopPick` uses, over an array.
+ *
+ * Deliberately not a Prisma emulator, and deliberately **not** a `mockResolvedValue`:
+ * the thing under test is which row an ordering picks, and a mock returning a fixed
+ * row answers that question for the code instead of asking it.
+ *
+ * It honours Prisma's multi-key `orderBy` rather than rejecting it, so the ordering
+ * that caused the bug returns the **wrong row** here exactly as it did against
+ * Postgres. A fake that refused the query would fail the test for the wrong reason
+ * and would not show what went wrong. A `where` or `orderBy` key it genuinely cannot
+ * answer still throws, rather than being ignored.
+ */
+function pickTable(rows: PickRow[]) {
+  const value = (row: PickRow, key: string): number => {
+    if (key === 'generatedAt') return row.generatedAt.getTime();
+    if (key === 'rank') return row.rank;
+    throw new Error(`pickTable cannot order by ${key}`);
+  };
+
+  return (args: {
+    where: { userId: string; batchId?: string; state?: { not: string } };
+    orderBy: Record<string, 'asc' | 'desc'> | Record<string, 'asc' | 'desc'>[];
+  }): Promise<PickRow | null> => {
+    const { userId, batchId, state, ...unknownWhere } = args.where;
+
+    if (Object.keys(unknownWhere).length > 0) {
+      throw new Error(
+        `pickTable cannot honour where: ${Object.keys(unknownWhere).join(', ')}`,
+      );
+    }
+
+    const matched = rows.filter(
+      (row) =>
+        row.userId === userId &&
+        (batchId === undefined || row.batchId === batchId) &&
+        (state?.not === undefined || row.state !== state.not),
+    );
+
+    // One object or an array of them, which is how Prisma spells a multi-key sort.
+    const keys = (
+      Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy]
+    ).flatMap((clause) => Object.entries(clause));
+
+    const sorted = [...matched].sort((a, b) => {
+      for (const [key, direction] of keys) {
+        const difference = value(a, key) - value(b, key);
+        if (difference !== 0)
+          return direction === 'desc' ? -difference : difference;
+      }
+
+      return 0;
+    });
+
+    return Promise.resolve(sorted[0] ?? null);
+  };
+}
+
 describe('DashboardService', () => {
   const findMany = jest.fn();
   const findFirst = jest.fn();
   const count = jest.fn();
   const getGateState = jest.fn();
   const findFirstPick = jest.fn();
+
+  /** Points `prisma.pick.findFirst` at a table that really sorts. */
+  const usePickTable = (rows: PickRow[]) =>
+    findFirstPick.mockImplementation(pickTable(rows));
 
   let dashboard: DashboardService;
 
@@ -410,19 +508,11 @@ describe('DashboardService', () => {
       await expect(dashboard.getTopPick(USER)).resolves.toBeNull();
     });
 
-    it('reads rank 0 of the newest batch, skipping dismissed picks', async () => {
-      findFirstPick.mockResolvedValue({
-        id: 'pick-1',
-        name: 'Arrival',
-        year: 2016,
-        type: 'movie',
-        posterPath: '/arrival.jpg',
-        reason: 'Because you rated Blade Runner 2049 highly.',
-        genre: { name: 'Sci-Fi', colorSlot: 1 },
-      });
+    it('serialises the card the teaser draws', async () => {
+      usePickTable([pick({ rank: 0, name: 'Arrival' })]);
 
       await expect(dashboard.getTopPick(USER)).resolves.toEqual({
-        id: 'pick-1',
+        id: 'pick-rank-0',
         name: 'Arrival',
         year: 2016,
         type: 'movie',
@@ -430,13 +520,82 @@ describe('DashboardService', () => {
         posterPath: '/arrival.jpg',
         reason: 'Because you rated Blade Runner 2049 highly.',
       });
+    });
 
-      expect(findFirstPick).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { userId: USER, state: { not: 'dismissed' } },
-          orderBy: [{ generatedAt: 'desc' }, { rank: 'asc' }],
+    /*
+     * The bug this replaces a mock to catch. Three rows of one batch were stamped
+     * milliseconds apart, so ordering by `generatedAt` desc then `rank` asc was
+     * decided entirely by the first key: the last row written won, and the teaser
+     * advertised rank 2 while the Picker page listed rank 0 first.
+     *
+     * A `findFirst` mock cannot fail this test, because it returns whatever it was
+     * told to regardless of the ordering asked for. So these run over a table that
+     * actually sorts.
+     */
+    it('reads rank 0 even when the batch rows were stamped apart', async () => {
+      usePickTable([
+        pick({
+          rank: 0,
+          name: 'Arrival',
+          generatedAt: '2026-10-17T09:00:00.100Z',
         }),
-      );
+        pick({
+          rank: 1,
+          name: 'Annihilation',
+          generatedAt: '2026-10-17T09:00:00.200Z',
+        }),
+        pick({
+          rank: 2,
+          name: 'Ad Astra',
+          generatedAt: '2026-10-17T09:00:00.300Z',
+        }),
+      ]);
+
+      await expect(dashboard.getTopPick(USER)).resolves.toMatchObject({
+        name: 'Arrival',
+      });
+    });
+
+    it('prefers the newest batch over an older one', async () => {
+      usePickTable([
+        pick({
+          rank: 0,
+          name: 'Arrival',
+          generatedAt: '2026-09-01T09:00:00Z',
+          batchId: 'batch-old',
+        }),
+        pick({
+          rank: 0,
+          name: 'Ad Astra',
+          generatedAt: '2026-10-17T09:00:00Z',
+          batchId: 'batch-new',
+        }),
+      ]);
+
+      await expect(dashboard.getTopPick(USER)).resolves.toMatchObject({
+        name: 'Ad Astra',
+      });
+    });
+
+    // A dismissed rank 0 must promote rank 1 rather than empty the teaser.
+    it('promotes the next rank when rank 0 is dismissed', async () => {
+      usePickTable([
+        pick({ rank: 0, name: 'Arrival', state: 'dismissed' }),
+        pick({ rank: 1, name: 'Annihilation' }),
+      ]);
+
+      await expect(dashboard.getTopPick(USER)).resolves.toMatchObject({
+        name: 'Annihilation',
+      });
+    });
+
+    it('is null when every pick in the newest batch is dismissed', async () => {
+      usePickTable([
+        pick({ rank: 0, name: 'Arrival', state: 'dismissed' }),
+        pick({ rank: 1, name: 'Annihilation', state: 'dismissed' }),
+      ]);
+
+      await expect(dashboard.getTopPick(USER)).resolves.toBeNull();
     });
   });
 

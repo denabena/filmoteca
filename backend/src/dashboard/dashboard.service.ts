@@ -334,11 +334,34 @@ export class DashboardService {
     return [...months].sort().reverse();
   }
 
-  /** The current top pick for the teaser: rank 0 of the newest batch (DSH-8). */
+  /**
+   * The current top pick for the teaser: rank 0 of the newest batch (DSH-8).
+   *
+   * **Resolved in two steps, the same way `PicksService.getCurrent` does it, and
+   * that is the point rather than a redundancy.** Sorting by `generatedAt` desc
+   * then `rank` asc in one query looks equivalent and is not: it only lands on
+   * rank 0 if every row in the batch shares a timestamp. When they did not, the
+   * first sort key alone decided it and the last row written won, so the teaser
+   * advertised one film and the Picker page's first card was another. Two screens
+   * whose whole promise is showing the same card disagreed.
+   *
+   * Picking the batch first makes the rank the only thing that orders within it,
+   * so this holds however the rows were stamped.
+   */
   async getTopPick(userId: string): Promise<TopPick | null> {
-    const latest = await this.prisma.pick.findFirst({
+    const newest = await this.prisma.pick.findFirst({
       where: { userId, state: { not: 'dismissed' } },
-      orderBy: [{ generatedAt: 'desc' }, { rank: 'asc' }],
+      orderBy: { generatedAt: 'desc' },
+      select: { batchId: true },
+    });
+
+    if (!newest) return null;
+
+    // Lowest surviving rank in that batch, so a dismissed rank 0 promotes rank 1
+    // rather than emptying the teaser.
+    const latest = await this.prisma.pick.findFirst({
+      where: { userId, batchId: newest.batchId, state: { not: 'dismissed' } },
+      orderBy: { rank: 'asc' },
       include: { genre: true },
     });
 

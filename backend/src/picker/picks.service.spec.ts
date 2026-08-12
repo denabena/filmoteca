@@ -8,6 +8,42 @@ import { PicksService } from './picks.service';
 
 const USER = 'neon-user-123';
 
+/** A pool row as `findEligible` returns it: a catalogue title joined to its genre. */
+function candidate(
+  overrides: { tmdbId: number; name: string; voteAverage?: number } = {
+    tmdbId: 1,
+    name: 'Arrival',
+  },
+) {
+  const { tmdbId, name, voteAverage = 8 } = overrides;
+
+  return {
+    id: `catalogue-${tmdbId}`,
+    tmdbId,
+    type: 'movie' as const,
+    name,
+    year: 2016,
+    runtime: 116,
+    genreId: 'genre-uuid',
+    tmdbGenreIds: [878],
+    overview: null,
+    posterPath: '/arrival.jpg',
+    voteAverage,
+    voteCount: 12_000,
+    syncedAt: new Date('2026-08-01T00:00:00Z'),
+    createdAt: new Date('2026-08-01T00:00:00Z'),
+    genre: {
+      id: 'genre-uuid',
+      slug: 'sci-fi',
+      name: 'Sci-Fi',
+      colorSlot: 1,
+      descriptor: null,
+      tmdbMovieId: 878,
+      tmdbTvId: 10_765,
+    },
+  };
+}
+
 describe('PicksService', () => {
   const findEligible = jest.fn();
   const getState = jest.fn();
@@ -15,6 +51,7 @@ describe('PicksService', () => {
   const findManyTitles = jest.fn();
   const findFirstPick = jest.fn();
   const updatePick = jest.fn();
+  const upsertPick = jest.fn();
 
   let picks: PicksService;
 
@@ -27,6 +64,15 @@ describe('PicksService', () => {
     findManyTitles.mockReset().mockResolvedValue([]);
     findFirstPick.mockReset().mockResolvedValue(null);
     updatePick.mockReset().mockResolvedValue({});
+    // Echoes the row back with its genre, which is what `toCard` reads.
+    upsertPick.mockReset().mockImplementation(
+      (args: { create: Record<string, unknown> }) =>
+        ({
+          ...args.create,
+          id: 'pick-uuid',
+          genre: { name: 'Sci-Fi', colorSlot: 1 },
+        }) as unknown,
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,9 +84,12 @@ describe('PicksService', () => {
             pick: {
               findFirst: findFirstPick,
               update: updatePick,
+              upsert: upsertPick,
               findMany: jest.fn(),
             },
-            $transaction: jest.fn(),
+            // The array form: Prisma resolves every operation together, so the fake
+            // has to as well or the batch tests see one write instead of three.
+            $transaction: (operations: unknown[]) => Promise.all(operations),
           },
         },
         { provide: CandidatesRepository, useValue: { findEligible } },
@@ -96,6 +145,57 @@ describe('PicksService', () => {
       await picks.generate(USER, []);
 
       expect(findEligible).toHaveBeenCalledWith(USER, [], 60);
+    });
+
+    /*
+     * A batch is one generation event, so its rows share one timestamp.
+     *
+     * This is not housekeeping. `DashboardService.getTopPick` finds the newest
+     * batch by `generatedAt`, and when the three rows were stamped milliseconds
+     * apart the last one written won: the dashboard teaser advertised rank 2 while
+     * the Picker page listed rank 0 first, so two screens whose entire promise is
+     * showing the same card showed different films.
+     */
+    it('stamps every row in a batch with one time', async () => {
+      findEligible.mockResolvedValue([
+        candidate({ tmdbId: 1, name: 'Arrival' }),
+        candidate({ tmdbId: 2, name: 'Annihilation' }),
+        candidate({ tmdbId: 3, name: 'Ad Astra' }),
+      ]);
+
+      await picks.generate(USER, []);
+
+      const stamps = upsertPick.mock.calls.map(
+        ([args]: [
+          { create: { generatedAt: Date }; update: { generatedAt: Date } },
+        ]) => [args.create.generatedAt, args.update.generatedAt],
+      );
+
+      expect(stamps).toHaveLength(3);
+      // Every create and every update, one value. `new Set` over the ISO strings is
+      // the whole assertion: three rows, one instant.
+      expect(new Set(stamps.flat().map((at) => at.toISOString())).size).toBe(1);
+    });
+
+    it('numbers the batch from rank 0, best match first', async () => {
+      findEligible.mockResolvedValue([
+        candidate({ tmdbId: 1, name: 'Weakest', voteAverage: 2 }),
+        candidate({ tmdbId: 2, name: 'Strongest', voteAverage: 10 }),
+      ]);
+
+      await picks.generate(USER, []);
+
+      const byRank = upsertPick.mock.calls.map(
+        ([args]: [{ create: { rank: number; name: string } }]) => [
+          args.create.rank,
+          args.create.name,
+        ],
+      );
+
+      expect(byRank).toEqual([
+        [0, 'Strongest'],
+        [1, 'Weakest'],
+      ]);
     });
   });
 
