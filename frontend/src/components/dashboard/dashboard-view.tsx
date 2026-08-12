@@ -1,8 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { fetchMonthlyStats } from '@/app/(shell)/actions';
+import { AddTitleButton } from '@/components/shell/add-title-button';
+import { PageHeader } from '@/components/shell/page-header';
 import type { MonthlyStats } from '@/lib/dashboard';
 import { MonthSelect } from './month-select';
 import { StatCards } from './stat-cards';
@@ -55,28 +56,25 @@ export function DashboardView({
 
   return (
     <main className="flex flex-1 flex-col">
-      <div className="flex w-full items-center justify-between px-[40px] pt-[28px] pb-[18px]">
-        <div className="flex flex-col gap-[3px]">
-          <p className="text-text-secondary text-[13px] font-medium">Welcome back, {firstName}</p>
-          <h1 className="font-display text-[24px] leading-[1.16] font-bold tracking-[-0.24px]">
-            Dashboard
-          </h1>
-        </div>
-        <div className="flex items-center gap-[12px]">
-          <MonthSelect
-            months={availableMonths}
-            selected={stats.month}
-            onChange={choose}
-            disabled={isPending}
-          />
-          <Link
-            href="/titles/new"
-            className="bg-accent text-text-on-accent rounded-[12px] px-[20px] py-[13px] text-[14px] font-semibold"
-          >
-            Add title
-          </Link>
-        </div>
-      </div>
+      {/*
+        A13: "Welcome back" is fixed text with no time-of-day variants anywhere in
+        the design, so only the name is dynamic and it comes from the session.
+      */}
+      <PageHeader
+        overline={`Welcome back, ${firstName}`}
+        title="Dashboard"
+        actions={
+          <>
+            <MonthSelect
+              months={availableMonths}
+              selected={stats.month}
+              onChange={choose}
+              disabled={isPending}
+            />
+            <AddTitleButton />
+          </>
+        }
+      />
 
       <div className="flex flex-1 flex-col gap-[12px] px-[40px] pb-[14px]">
         {hero}

@@ -1,4 +1,4 @@
-import { AddTitleForm } from '@/components/titles/add-title-form';
+import { TitleForm } from '@/components/titles/title-form';
 import { apiFetch } from '@/lib/api';
 import type { GenreOption } from '@/lib/dashboard';
 
@@ -19,7 +19,7 @@ export default async function AddTitlePage() {
 
   return (
     <main className="flex flex-1 items-start justify-center px-[40px] py-[40px]">
-      <AddTitleForm genres={genres} />
+      <TitleForm genres={genres} />
     </main>
   );
 }
