@@ -237,11 +237,33 @@ describe('PickerTeaser', () => {
     expect(screen.getByRole('link', { name: /Open Picker/ })).toHaveAttribute('href', '/picker');
   });
 
-  it('stays locked-looking when unlocked but nothing is generated yet', () => {
+  /*
+   * Unlocked with nothing generated is its own state, and every user passes
+   * through it: the gate opens on the third rating, but no batch exists until the
+   * Picker page is opened.
+   *
+   * The old assertion checked only the body, so the label was free to say
+   * "PICKER LOCKED" above "Generate your first picks" and a link into the Picker.
+   * A card cannot claim the feature is locked and invite you in at once, and the
+   * dashboard must not call it locked while the Picker page lets the user through
+   * (FIL-67).
+   */
+  it('does not call the Picker locked once it is unlocked', () => {
     render(<PickerTeaser picker={gate({ unlocked: true, ratedCount: 5 })} topPick={null} />);
 
+    expect(screen.queryByText('PICKER LOCKED')).not.toBeInTheDocument();
+    expect(screen.getByText('SCENE PICKER')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No pick yet' })).toBeInTheDocument();
     expect(screen.getByText('Generate your first picks')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open Picker/ })).toHaveAttribute('href', '/picker');
+  });
+
+  // The genuinely locked card keeps saying so.
+  it('still calls it locked below the threshold', () => {
+    render(<PickerTeaser picker={gate()} topPick={null} />);
+
+    expect(screen.getByText('PICKER LOCKED')).toBeInTheDocument();
+    expect(screen.queryByText('SCENE PICKER')).not.toBeInTheDocument();
   });
 });
 
