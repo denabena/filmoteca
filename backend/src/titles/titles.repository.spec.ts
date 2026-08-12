@@ -22,6 +22,7 @@ describe('TitlesRepository', () => {
   const findMany = jest.fn();
   const findFirst = jest.fn();
   const count = jest.fn();
+  const groupBy = jest.fn();
   const update = jest.fn();
   const remove = jest.fn();
 
@@ -30,9 +31,10 @@ describe('TitlesRepository', () => {
   const stored = { id: 'title-uuid', userId: OWNER } as Title;
 
   beforeEach(async () => {
-    [create, findMany, findFirst, count, update, remove].forEach((m) =>
+    [create, findMany, findFirst, count, groupBy, update, remove].forEach((m) =>
       m.mockReset(),
     );
+    groupBy.mockResolvedValue([]);
     create.mockResolvedValue(stored);
     findMany.mockResolvedValue([stored]);
     findFirst.mockResolvedValue(stored);
@@ -50,6 +52,7 @@ describe('TitlesRepository', () => {
               findMany,
               findFirst,
               count,
+              groupBy,
               update,
               delete: remove,
             },
@@ -111,6 +114,29 @@ describe('TitlesRepository', () => {
       expect(findMany).toHaveBeenCalledWith({ where: { userId: OWNER } });
     });
 
+    // FIL-41's list reads through this, so the owner has to survive the include.
+    it('scopes a genre-joined list to the owner', async () => {
+      await titles.findManyWithGenre(OWNER, {
+        where: { status: 'watched' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: { status: 'watched', userId: OWNER },
+        orderBy: { createdAt: 'desc' },
+        include: { genre: true },
+      });
+    });
+
+    it('refuses to let a caller substitute another owner on the joined list', async () => {
+      await titles.findManyWithGenre(OWNER, { where: { userId: INTRUDER } });
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: { userId: OWNER },
+        include: { genre: true },
+      });
+    });
+
     it('scopes a single read by id and owner together', async () => {
       await titles.findById(OWNER, 'title-uuid');
 
@@ -124,6 +150,24 @@ describe('TitlesRepository', () => {
 
       expect(count).toHaveBeenCalledWith({
         where: { status: 'watched', userId: OWNER },
+      });
+    });
+
+    // FIL-43 derives the genre cards from this, so a missing owner here would
+    // count the whole table's titles into one user's cards.
+    it('scopes the per-genre grouping to the owner', async () => {
+      groupBy.mockResolvedValue([
+        { genreId: 'genre-uuid', _count: { _all: 3 } },
+      ]);
+
+      await expect(titles.countByGenre(OWNER)).resolves.toEqual([
+        { genreId: 'genre-uuid', count: 3 },
+      ]);
+
+      expect(groupBy).toHaveBeenCalledWith({
+        by: ['genreId'],
+        where: { userId: OWNER },
+        _count: { _all: true },
       });
     });
   });

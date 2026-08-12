@@ -1,6 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, type Title } from '@prisma/client';
+import { Prisma, type Genre, type Title } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * A title with its genre row attached.
+ *
+ * The library table (FIL-45) draws a coloured dot beside a genre name, so a bare
+ * `genreId` is not enough and every row would otherwise need a second lookup.
+ */
+export type TitleWithGenre = Title & { genre: Genre };
+
+/** One genre's share of the owner's library, from `countByGenre` (FIL-43). */
+export interface GenreTitleCount {
+  genreId: string;
+  count: number;
+}
 
 /**
  * What a caller may set when creating a title.
@@ -74,6 +88,26 @@ export class TitlesRepository {
     });
   }
 
+  /**
+   * As findMany, but with each title's genre row attached (FIL-41).
+   *
+   * A separate method rather than an `include` passed through findMany, because
+   * only the include makes the return type honest: `findMany` is declared to
+   * return `Title[]` and an included relation would be present at runtime but
+   * invisible to the compiler, which is how a caller ends up reading
+   * `title.genre.name` off a type that never promised it.
+   */
+  findManyWithGenre(
+    userId: string,
+    args: Omit<ScopedFindManyArgs, 'include'> = {},
+  ): Promise<TitleWithGenre[]> {
+    return this.prisma.title.findMany({
+      ...args,
+      where: { ...args.where, userId },
+      include: { genre: true },
+    });
+  }
+
   /** The owner's first matching title, or null. Used for the dashboard hero. */
   findFirst(
     userId: string,
@@ -102,6 +136,30 @@ export class TitlesRepository {
     }
 
     return title;
+  }
+
+  /**
+   * How many of the owner's titles sit in each genre (FIL-43).
+   *
+   * One grouped query rather than twelve counts. Empty genres are absent from the
+   * result by construction, because `GROUP BY` can only return groups that have a
+   * row, which is exactly the "a genre with no titles does not appear" rule: the
+   * caller does not filter zeros out, they never arrive.
+   *
+   * Derived on every read and never stored, so nothing needs invalidating when a
+   * title is deleted or its genre changed.
+   */
+  async countByGenre(userId: string): Promise<GenreTitleCount[]> {
+    const groups = await this.prisma.title.groupBy({
+      by: ['genreId'],
+      where: { userId },
+      _count: { _all: true },
+    });
+
+    return groups.map((group) => ({
+      genreId: group.genreId,
+      count: group._count._all,
+    }));
   }
 
   /** Counts the owner's titles. Feeds the Picker unlock rule (FIL-67). */

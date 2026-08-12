@@ -20,7 +20,9 @@ import { getAuth } from '@/lib/auth/server';
  */
 export async function apiFetch<T>(
   path: string,
-  init: { method?: 'GET' | 'POST'; body?: unknown } = {},
+  // PUT and DELETE arrive with the Edit modal and the delete dialog (FIL-61,
+  // FIL-63). Listed rather than left as `string` so a typo is a build error.
+  init: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {},
 ): Promise<T> {
   const auth = getAuth();
   const session = await auth.getSession();

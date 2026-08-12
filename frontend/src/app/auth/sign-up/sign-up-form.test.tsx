@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import SignUpPage from './page';
+import { SignUpForm } from './sign-up-form';
 
 const mockPush = jest.fn();
 const mockRefresh = jest.fn();
@@ -22,9 +22,9 @@ beforeEach(() => {
   mockSignUp.mockReset();
 });
 
-describe('SignUpPage validation', () => {
+describe('SignUpForm validation', () => {
   it('marks every failing field on an empty submit and does not call the API', async () => {
-    render(<SignUpPage />);
+    render(<SignUpForm />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
@@ -37,7 +37,7 @@ describe('SignUpPage validation', () => {
 
   it('submits to Neon Auth when every field is valid and consent is checked', async () => {
     mockSignUp.mockResolvedValue({ error: null });
-    render(<SignUpPage />);
+    render(<SignUpForm />);
 
     await userEvent.type(screen.getByLabelText('Name'), 'Ana Skukan');
     await userEvent.type(screen.getByLabelText('Email'), 'ana@example.com');
