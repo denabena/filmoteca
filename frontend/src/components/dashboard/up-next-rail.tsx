@@ -35,7 +35,7 @@ function Cards({ titles }: { titles: UpNextTitle[] }) {
   return (
     // Scrolls rather than wraps: the design lays out a single row, and the
     // backend caps this at the seven cards DSH-6 draws, so overflow is rare.
-    <ul className="flex w-full items-start gap-[16px] overflow-x-auto">
+    <ul className="rise-list flex w-full items-start gap-[16px] overflow-x-auto">
       {titles.map((title) => (
         <li key={title.id} className="w-[120px] shrink-0">
           {/* LIB-7 / A15: a card opens that title's detail screen. */}

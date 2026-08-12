@@ -60,7 +60,7 @@ export function TitlesTable({
             </Th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="rise-list">
           {titles.map((title) => (
             <TitleRow
               key={title.id}

@@ -25,7 +25,7 @@ export function TitleDetailCard({
     .join(' · ');
 
   return (
-    <div className="flex w-full items-start gap-[20px]">
+    <div className="rise flex w-full items-start gap-[20px]">
       <section className="bg-surface-card border-border-default flex flex-1 items-start gap-[28px] rounded-[18px] border p-[24px]">
         <Poster
           posterPath={title.posterPath}

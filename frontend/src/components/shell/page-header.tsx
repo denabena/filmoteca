@@ -29,7 +29,7 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="flex w-full items-center justify-between px-[40px] pt-[28px] pb-[18px]">
+    <header className="rise flex w-full items-center justify-between px-[40px] pt-[28px] pb-[18px]">
       <div className="flex flex-col gap-[3px]">
         <p className="text-text-secondary text-[13px] font-medium">{overline}</p>
         <h1 className="font-display text-[24px] leading-[1.16] font-bold tracking-[-0.24px]">

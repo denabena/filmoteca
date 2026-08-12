@@ -46,7 +46,7 @@ export function PickerBoard({ picks }: { picks: PickCardData[] }) {
           <h2 className="text-[18px] leading-[1.3] font-semibold tracking-[-0.18px]">
             Tonight&rsquo;s picks for you
           </h2>
-          <div className="flex w-full flex-col gap-[20px]">
+          <div className="rise-list flex w-full flex-col gap-[20px]">
             {picks.map((pick) => (
               <PickCard key={pick.id} pick={pick} />
             ))}
