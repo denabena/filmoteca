@@ -11,6 +11,8 @@ jest.mock('next/navigation', () => ({
 
 /** The heart's own behaviour is `favorite-heart.test.tsx`; here it just needs one. */
 const noopToggle = jest.fn().mockResolvedValue({ favorite: false });
+/** The menu's own behaviour is `row-menu-actions.test.tsx`. */
+const noopMarkWatched = jest.fn().mockResolvedValue(true);
 
 function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
   return {
@@ -37,7 +39,7 @@ function title(overrides: Partial<TitleListItem> = {}): TitleListItem {
 function renderTable(titles: TitleListItem[] = [title()]) {
   return render(
     <div onClick={(event) => event.preventDefault()}>
-      <TitlesTable titles={titles} onToggleFavorite={noopToggle} />
+      <TitlesTable titles={titles} onToggleFavorite={noopToggle} onMarkWatched={noopMarkWatched} />
     </div>,
   );
 }

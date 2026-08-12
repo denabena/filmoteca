@@ -1,4 +1,4 @@
-import { toggleFavorite } from '@/app/(shell)/titles/actions';
+import { markWatched, toggleFavorite } from '@/app/(shell)/titles/actions';
 import { GenreCards } from '@/components/library/genre-cards';
 import { LibraryView } from '@/components/library/library-view';
 import { NewGenreButton } from '@/components/library/new-genre-button';
@@ -39,6 +39,7 @@ export default async function LibraryPage() {
         <LibraryView
           titles={titles}
           onToggleFavorite={toggleFavorite}
+          onMarkWatched={markWatched}
           genres={<GenreCards genres={genres} />}
           genresControls={<NewGenreButton />}
         />
