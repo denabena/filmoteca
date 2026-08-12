@@ -15,7 +15,25 @@ import { Poster } from './poster';
  * `topPick` is rank 0 of the newest batch, so it is the same card the Picker page
  * shows first (FIL-73). It is null when the Picker is locked, and also when it is
  * unlocked but nothing has been generated yet.
+ *
+ * **Those last two are different states and the label has to tell them apart.**
+ * Reading the eyebrow off `topPick` alone said "PICKER LOCKED" above a body
+ * offering "Generate your first picks" and a link to the Picker, which is the
+ * card contradicting itself. It is also the state every user passes through: rate
+ * a third title and the gate opens, but no batch exists until the Picker page is
+ * opened, so the dashboard called the feature locked while the Picker page let
+ * them in. That is precisely the disagreement FIL-67 exists to prevent.
+ *
+ * The middle label is a working decision. The design draws only locked and filled,
+ * so "SCENE PICKER" is borrowed from the Picker page's own eyebrow rather than
+ * invented, and "TONIGHT'S PICK" is not reused because there is no pick yet.
  */
+function eyebrow(picker: PickerGateState, topPick: TopPick | null): string {
+  if (topPick) return "TONIGHT'S PICK";
+
+  return picker.unlocked ? 'SCENE PICKER' : 'PICKER LOCKED';
+}
+
 export function PickerTeaser({
   picker,
   topPick,
@@ -30,7 +48,7 @@ export function PickerTeaser({
     >
       <p className="text-accent flex items-center gap-[8px] text-[11px] font-medium tracking-[0.88px]">
         <Icon src="/icons/sparkle.svg" className="size-[15px]" />
-        {topPick ? "TONIGHT'S PICK" : 'PICKER LOCKED'}
+        {eyebrow(picker, topPick)}
       </p>
 
       {topPick ? <FilledTeaser pick={topPick} /> : <LockedTeaser picker={picker} />}
