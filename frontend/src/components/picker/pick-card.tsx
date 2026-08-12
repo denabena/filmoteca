@@ -21,7 +21,7 @@ export function PickCard({ pick }: { pick: PickCardData }) {
     .join(' · ');
 
   return (
-    <article className="bg-surface-card border-border-default flex w-full items-center gap-[20px] rounded-[16px] border py-[20px] pr-[24px] pl-[20px]">
+    <article className="bg-surface-card border-border-default flex w-full flex-col items-start gap-[20px] rounded-[16px] border px-4 py-[20px] sm:flex-row sm:items-center sm:pr-[24px] sm:pl-[20px]">
       <Poster
         posterPath={pick.posterPath}
         name={pick.name}

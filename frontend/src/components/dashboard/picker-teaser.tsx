@@ -44,7 +44,7 @@ export function PickerTeaser({
   return (
     <section
       aria-labelledby="picker-teaser-heading"
-      className="bg-surface-elevated border-border-strong relative flex w-[380px] shrink-0 flex-col gap-[14px] overflow-hidden rounded-[16px] border px-[24px] py-[18px]"
+      className="bg-surface-elevated border-border-strong relative flex w-full shrink-0 flex-col gap-[14px] overflow-hidden rounded-[16px] border px-[24px] py-[18px] xl:w-[380px]"
     >
       <p className="text-accent flex items-center gap-[8px] text-[11px] font-medium tracking-[0.88px]">
         <Icon src="/icons/sparkle.svg" className="size-[15px]" />

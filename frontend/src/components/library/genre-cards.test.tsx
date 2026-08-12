@@ -61,7 +61,10 @@ describe('Genre cards (FIL-50)', () => {
       );
 
       expect(screen.getAllByRole('listitem')).toHaveLength(2);
-      expect(container.querySelector('.grid-cols-2')).toBeInTheDocument();
+      // Two columns from `sm` up, one below it: the designed grid is 820px wide and
+      // two of those cards side by side on a phone would be unreadable (FIL-85).
+      expect(container.querySelector('.sm\\:grid-cols-2')).toBeInTheDocument();
+      expect(container.querySelector('.grid-cols-1')).toBeInTheDocument();
     });
 
     it('shows the name, the count and the coloured tile', () => {

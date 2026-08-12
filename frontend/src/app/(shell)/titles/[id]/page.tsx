@@ -25,7 +25,7 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ id
 
   return (
     <main className="flex flex-1 flex-col">
-      <div className="flex w-full items-center justify-between px-[40px] pt-[28px] pb-[18px]">
+      <div className="flex w-full flex-wrap items-center justify-between gap-[12px] px-4 pt-[22px] pb-[18px] md:px-[40px] md:pt-[28px]">
         <nav aria-label="Breadcrumb" className="flex items-center gap-[10px] text-[13px]">
           <Link href="/library" className="text-text-secondary">
             Library
@@ -48,7 +48,7 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ id
         </Link>
       </div>
 
-      <div className="px-[40px] pb-[40px]">
+      <div className="px-4 pb-[40px] md:px-[40px]">
         <TitleDetailCard title={title} genre={genre} />
       </div>
     </main>

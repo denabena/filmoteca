@@ -84,7 +84,7 @@ export function LibraryTabs({
   return (
     <>
       {/* Tabs left, that tab's own controls right, as frame 06 lays them out. */}
-      <div className="flex items-center justify-between gap-[16px]">
+      <div className="flex flex-col items-stretch justify-between gap-[12px] lg:flex-row lg:items-center lg:gap-[16px]">
         {/*
         "Joined" in the design means one bordered container with a shared divider,
         not two separate pills: the border and radius live on the tablist and the

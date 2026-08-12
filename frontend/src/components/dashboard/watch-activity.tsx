@@ -21,7 +21,7 @@ export function WatchActivity({ activity }: { activity: ActivityStat }) {
   return (
     <section
       aria-labelledby="watch-activity-heading"
-      className="bg-surface-card border-border-default flex min-w-0 flex-1 flex-col gap-[18px] rounded-[16px] border px-[28px] py-[20px]"
+      className="bg-surface-card border-border-default flex min-w-0 flex-1 flex-col gap-[18px] rounded-[16px] border px-4 py-[20px] sm:px-[28px]"
     >
       <div className="flex w-full items-center justify-between">
         <h2

@@ -19,8 +19,8 @@ export default function TitleDetailLoading() {
         {/* Breadcrumb back to the Library (DET-1). */}
         <SkeletonText className="h-[11px] w-[128px]" />
 
-        <SkeletonCard className="flex gap-[28px] p-[28px]">
-          <Skeleton className="h-[300px] w-[204px] shrink-0 rounded-[12px]" />
+        <SkeletonCard className="flex flex-col gap-[28px] p-4 sm:p-[28px] lg:flex-row">
+          <Skeleton className="h-[300px] w-[204px] shrink-0 rounded-[12px] max-sm:w-full" />
 
           <div className="flex flex-1 flex-col gap-[18px]">
             <div className="flex flex-col gap-[8px]">

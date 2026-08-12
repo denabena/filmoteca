@@ -16,7 +16,7 @@ import type { PickerGateState } from '@/lib/dashboard';
 export function PickerLocked({ picker }: { picker: PickerGateState }) {
   return (
     <div className="flex flex-1 items-center justify-center">
-      <section className="bg-surface-card border-border-default flex w-[440px] flex-col items-center gap-[10px] rounded-[18px] border px-[40px] py-[44px] text-center">
+      <section className="bg-surface-card border-border-default flex w-[440px] max-w-full flex-col items-center gap-[10px] rounded-[18px] border px-6 py-[44px] text-center sm:px-[40px]">
         <Icon src="/icons/sparkle-lg.svg" className="mb-[6px] size-[28px]" />
         <h2 className="text-[18px] leading-[1.3] font-semibold tracking-[-0.18px]">
           The Picker needs a few titles first

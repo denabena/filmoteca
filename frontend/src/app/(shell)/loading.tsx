@@ -19,7 +19,7 @@ export default function DashboardLoading() {
 
       <PageBodySkeleton className="gap-[20px]">
         {/* Continue watching hero, then the picker teaser beside it (380px, per DSH-8). */}
-        <div className="flex gap-[18px]">
+        <div className="flex flex-col gap-[18px] xl:flex-row">
           <SkeletonCard className="flex h-[196px] flex-1 items-center gap-[18px] p-[24px]">
             <Skeleton className="h-[148px] w-[104px] rounded-[10px]" />
             <div className="flex flex-col gap-[10px]">
@@ -30,7 +30,7 @@ export default function DashboardLoading() {
             </div>
           </SkeletonCard>
 
-          <SkeletonCard className="flex h-[196px] w-[380px] shrink-0 flex-col gap-[14px] px-[24px] py-[18px]">
+          <SkeletonCard className="flex h-[196px] w-full shrink-0 flex-col gap-[14px] px-[24px] py-[18px] xl:w-[380px]">
             <SkeletonText className="h-[11px] w-[104px]" />
             <div className="flex items-center gap-[14px]">
               <Skeleton className="h-[80px] w-[56px] rounded-[6px]" />
@@ -44,7 +44,7 @@ export default function DashboardLoading() {
         </div>
 
         {/* The three stat cards (DSH-3 to DSH-5), staggered as they arrive. */}
-        <div className="rise-list flex gap-[18px]">
+        <div className="rise-list flex flex-col gap-[18px] sm:flex-row">
           {Array.from({ length: 3 }, (_, i) => (
             <SkeletonCard key={i} className="flex flex-1 flex-col gap-[10px] px-[22px] py-[18px]">
               <SkeletonText className="h-[10px] w-[112px]" />
