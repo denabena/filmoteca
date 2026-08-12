@@ -38,6 +38,34 @@ export function getAuth(): NeonAuth {
         // Better Auth rejects anything under 32 characters, so a short secret
         // fails here rather than silently weakening session signing.
         secret: requireEnv('NEON_AUTH_COOKIE_SECRET'),
+
+        /*
+         * **Required for OAuth to work at all. Do not drop this to take the
+         * SDK's default.**
+         *
+         * Signing in with Google is a round trip: we send the browser to Google,
+         * Google returns it to Neon, and Neon returns it to us with a
+         * `neon_auth_session_verifier` query parameter. The SDK's middleware then
+         * exchanges that verifier for a session, but only if the request also
+         * carries the `session_challenge` cookie set when the flow started.
+         *
+         * `@neondatabase/auth` defaults that cookie to `SameSite=Strict`, and its
+         * own types call `lax` the "previous hard-coded behavior". A Strict cookie
+         * is **not sent on a cross-site top-level navigation**, which is exactly
+         * the trip back from Google, so the challenge never arrives, the exchange
+         * never runs, and the user lands on a protected route with no session and
+         * is redirected to sign in. Google authenticates them and a session row is
+         * created on Neon's side every time; the app simply never sees it. The
+         * symptom is "Google sign-in just bounces me back to sign in forever",
+         * with nothing in any log, because nothing failed.
+         *
+         * `lax` is the browser's own default for a cookie that does not say:
+         * sent on top-level GET navigations, withheld from cross-site
+         * subrequests, so it still blocks the CSRF that Strict is reached for.
+         * Email and password sign-in is unaffected either way, being same-site,
+         * which is why that kept working while Google did not.
+         */
+        sameSite: 'lax',
       },
     });
   }
