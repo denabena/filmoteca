@@ -111,6 +111,29 @@ describe('TitlesRepository', () => {
       expect(findMany).toHaveBeenCalledWith({ where: { userId: OWNER } });
     });
 
+    // FIL-41's list reads through this, so the owner has to survive the include.
+    it('scopes a genre-joined list to the owner', async () => {
+      await titles.findManyWithGenre(OWNER, {
+        where: { status: 'watched' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: { status: 'watched', userId: OWNER },
+        orderBy: { createdAt: 'desc' },
+        include: { genre: true },
+      });
+    });
+
+    it('refuses to let a caller substitute another owner on the joined list', async () => {
+      await titles.findManyWithGenre(OWNER, { where: { userId: INTRUDER } });
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: { userId: OWNER },
+        include: { genre: true },
+      });
+    });
+
     it('scopes a single read by id and owner together', async () => {
       await titles.findById(OWNER, 'title-uuid');
 
