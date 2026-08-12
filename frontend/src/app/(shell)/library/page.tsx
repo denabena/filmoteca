@@ -1,20 +1,22 @@
 import { toggleFavorite } from '@/app/(shell)/titles/actions';
-import { LibraryEmpty } from '@/components/library/library-empty';
-import { LibraryTabs } from '@/components/library/library-tabs';
-import { TitlesTable } from '@/components/library/titles-table';
+import { LibraryView } from '@/components/library/library-view';
 import { AddTitleButton } from '@/components/shell/add-title-button';
 import { PageHeader } from '@/components/shell/page-header';
 import { apiFetch } from '@/lib/api';
 import type { TitleListItem } from '@/lib/library';
 
 /**
- * The Library (06 / 12 / 13). LIB-1 and LIB-2 (FIL-44), plus the table (FIL-45).
+ * The Library (06 / 12 / 13). LIB-1 and LIB-2 (FIL-44), the table (FIL-45), the
+ * empty state (FIL-48) and the three controls (FIL-49).
  *
- * An async Server Component: the rows are fetched here and handed down, so no
- * loading state ships to the browser and the client boundary still stops at
- * `LibraryTabs`. The header sits **outside** it, which is what makes FIL-44's
- * AC7 structural rather than a promise: switching tabs cannot change a header
- * that is not inside the component doing the switching.
+ * An async Server Component: the rows are fetched once here and handed down, so
+ * no loading state ships to the browser. Everything below the header is one
+ * client island, `LibraryView`, because the controls sit on the tab row while
+ * what they narrow is the panel underneath, and one piece of state drives both.
+ *
+ * The header sits **outside** that island, which is what makes FIL-44's AC7
+ * structural rather than a promise: switching tabs cannot change a header that is
+ * not inside the component doing the switching.
  *
  * The genre cards are still a placeholder; they are FIL-50.
  */
@@ -26,23 +28,9 @@ export default async function LibraryPage() {
       <PageHeader overline="Your watchlist" title="Library" actions={<AddTitleButton />} />
 
       <div className="flex flex-1 flex-col gap-[18px] px-[40px] pb-[40px]">
-        <LibraryTabs
-          table={
-            /*
-             * The no-titles state (FIL-48), decided on the unfiltered count. The
-             * no-results state is a different screen and belongs to FIL-49, which
-             * owns the search that produces it: a library with ten titles and a
-             * query matching none has not earned "Add your first movie or show".
-             *
-             * The tabs and the controls around this stay visible, which frame 13
-             * draws deliberately.
-             */
-            titles.length === 0 ? (
-              <LibraryEmpty />
-            ) : (
-              <TitlesTable titles={titles} onToggleFavorite={toggleFavorite} />
-            )
-          }
+        <LibraryView
+          titles={titles}
+          onToggleFavorite={toggleFavorite}
           genres={<PanelPlaceholder>The genre cards land in FIL-50.</PanelPlaceholder>}
         />
       </div>

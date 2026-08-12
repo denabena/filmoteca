@@ -76,6 +76,60 @@ export const STATUS_TONE: Record<TitleStatus, { label: string; chip: string; dot
   },
 };
 
+/** The two orders the "Sort: Recent" dropdown offers. Mirrors the backend's. */
+export type TitleSort = 'recent' | 'oldest';
+
+/** What the three library controls narrow the list by (LIB-3 · FIL-49). */
+export interface LibraryFilters {
+  search: string;
+  /** Empty means all three, which is the dropdown's way back to everything. */
+  status: TitleStatus | '';
+  sort: TitleSort;
+}
+
+export const NO_FILTERS: LibraryFilters = { search: '', status: '', sort: 'recent' };
+
+/**
+ * Applies the three controls to an already-loaded list (FIL-49).
+ *
+ * **Filtering happens in the browser, not by refetching per keystroke.** A16
+ * already decided the whole list is loaded and the table scrolls, so the rows are
+ * all here: a round trip per character would add latency to a list the page is
+ * holding anyway, and it would make "filters as I type" depend on the network.
+ * The backend's own search (FIL-41) is still the right shape for the API and is
+ * what serves the initial load.
+ *
+ * The semantics deliberately match that endpoint's, because the two must not
+ * disagree about what a query means:
+ *
+ * - search is a case-insensitive substring of the name
+ * - status is equality, and an empty status matches everything
+ * - sort is by added date, and `oldest` is the exact reverse of `recent`
+ *
+ * The reversal is exact rather than approximate because the server already
+ * returned the list newest-first: `createdAt` is not on a list row, so reversing
+ * what arrived is not a shortcut around sorting, it *is* the sort.
+ */
+export function filterTitles(
+  titles: TitleListItem[],
+  { search, status, sort }: LibraryFilters,
+): TitleListItem[] {
+  const term = search.trim().toLowerCase();
+
+  const matched = titles.filter(
+    (title) =>
+      (term === '' || title.name.toLowerCase().includes(term)) &&
+      (status === '' || title.status === status),
+  );
+
+  return sort === 'oldest' ? [...matched].reverse() : matched;
+}
+
+/** True when any control is narrowing the list. Sort alone does not narrow. */
+export function hasActiveFilters({ search, status }: LibraryFilters): boolean {
+  return search.trim() !== '' || status !== '';
+}
+
 /**
  * How full each of the five stars is, left to right, as a fraction 0 to 1.
  *

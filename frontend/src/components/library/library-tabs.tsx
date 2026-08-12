@@ -29,7 +29,28 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
-export function LibraryTabs({ table, genres }: { table: ReactNode; genres: ReactNode }) {
+export function LibraryTabs({
+  table,
+  genres,
+  tableControls,
+  genresControls,
+}: {
+  table: ReactNode;
+  genres: ReactNode;
+  /**
+   * The controls that sit on the tab row beside the tabs, one set per tab: the
+   * search, status and sort trio on "All titles" (FIL-49), a "New genre" button
+   * on "Genres" (FIL-51).
+   *
+   * Slots rather than content, for the same reason the panels are: this
+   * component owns the switching and nothing else, so neither ticket has to
+   * reach into it. It does own *swapping* them, because the design puts a
+   * different set on each tab, and a control from the hidden tab left in the row
+   * would still be in the tab order.
+   */
+  tableControls?: ReactNode;
+  genresControls?: ReactNode;
+}) {
   const [active, setActive] = useState<TabId>('all');
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -62,45 +83,56 @@ export function LibraryTabs({ table, genres }: { table: ReactNode; genres: React
 
   return (
     <>
-      {/*
+      {/* Tabs left, that tab's own controls right, as frame 06 lays them out. */}
+      <div className="flex items-center justify-between gap-[16px]">
+        {/*
         "Joined" in the design means one bordered container with a shared divider,
         not two separate pills: the border and radius live on the tablist and the
         buttons only carry their own fill.
       */}
-      <div
-        role="tablist"
-        aria-label="Library view"
-        className="border-border-strong bg-surface-card inline-flex items-center overflow-hidden rounded-[10px] border"
-      >
-        {TABS.map((tab, index) => {
-          const selected = tab.id === active;
+        <div
+          role="tablist"
+          aria-label="Library view"
+          className="border-border-strong bg-surface-card inline-flex items-center overflow-hidden rounded-[10px] border"
+        >
+          {TABS.map((tab, index) => {
+            const selected = tab.id === active;
 
-          return (
-            <button
-              key={tab.id}
-              ref={(node) => {
-                tabRefs.current[tab.id] = node;
-              }}
-              type="button"
-              role="tab"
-              id={`library-tab-${tab.id}`}
-              aria-selected={selected}
-              aria-controls={`library-panel-${tab.id}`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => setActive(tab.id)}
-              onKeyDown={onKeyDown}
-              className={`px-[18px] py-[10px] text-[14px] font-medium outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-accent ${
-                index > 0 ? 'border-border-strong border-l' : ''
-              } ${
-                selected
-                  ? 'bg-surface-card-raised text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={tab.id}
+                ref={(node) => {
+                  tabRefs.current[tab.id] = node;
+                }}
+                type="button"
+                role="tab"
+                id={`library-tab-${tab.id}`}
+                aria-selected={selected}
+                aria-controls={`library-panel-${tab.id}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setActive(tab.id)}
+                onKeyDown={onKeyDown}
+                className={`px-[18px] py-[10px] text-[14px] font-medium outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-accent ${
+                  index > 0 ? 'border-border-strong border-l' : ''
+                } ${
+                  selected
+                    ? 'bg-surface-card-raised text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/*
+          Only the active tab's controls render, for the same reason only the
+          active panel does: a hidden tab's search box left in the DOM is still a
+          tab stop, and a user would reach a control that filters nothing they can
+          see.
+        */}
+        {active === 'all' ? tableControls : genresControls}
       </div>
 
       {/*
