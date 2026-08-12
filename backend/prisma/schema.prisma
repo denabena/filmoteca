@@ -40,8 +40,9 @@ enum TitleStatus {
 
 /// Per-user settings and identity, from the tech spec's Profile entity.
 ///
-/// `favoriteGenres` is the onboarding genre selection (FIL-23), added by the
-/// migration alongside the existing goal, default type and reminder fields.
+/// `favoriteGenres` (FIL-23), `email` (FIL-74) and `avatarUrl` (Settings photo)
+/// are added by the profile preferences and Settings work, alongside the
+/// existing goal, default type and reminders.
 model Profile {
   id String @id @default(uuid()) @db.Uuid
 
@@ -53,6 +54,18 @@ model Profile {
 
   firstName String? @map("first_name")
   lastName  String? @map("last_name")
+
+  /// Contact email shown and edited in Settings (SET-6), seeded from the Neon
+  /// Auth token on first login. Unique so Settings can reject an email already
+  /// taken. NOTE: this is the app-level profile email; it does NOT re-point the
+  /// Neon Auth sign-in credential (changing that is undesigned, A-note on FIL-74).
+  email String? @unique @map("email")
+
+  /// Profile photo as a small data URL (Settings "Change photo"). Not in the
+  /// original design (A28 has no upload flow) - added on request. Stored inline
+  /// because there is no object storage wired up; the frontend downsizes to a
+  /// ~256px square first so the row stays small.
+  avatarUrl String? @map("avatar_url") @db.Text
 
   /// The "15 titles / month" stepper on onboarding and in Settings.
   monthlyWatchGoal Int @default(15) @map("monthly_watch_goal")
